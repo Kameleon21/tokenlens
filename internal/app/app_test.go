@@ -1,8 +1,9 @@
-package main
+package app
 
 import (
 	"context"
 	"encoding/json"
+	"github.com/Kameleon21/tokenlens/internal/datefilter"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -13,35 +14,6 @@ import (
 	"time"
 )
 
-func TestRanges(t *testing.T) {
-	loc, _ := time.LoadLocation("America/New_York")
-	now := time.Date(2026, 3, 1, 1, 0, 0, 0, time.UTC)
-	cases := []struct {
-		s, u, g string
-		n       int
-		want    Range
-		bad     bool
-	}{
-		{"", "", "daily", 0, Range{"2026-02-01", "2026-02-28"}, false},
-		{"20240229", "", "daily", 0, Range{"2024-02-29", ""}, false},
-		{"", "2024-02-29", "weekly", 0, Range{"", "2024-02-29"}, false},
-		{"", "", "daily", 2, Range{"2026-02-27", "2026-02-28"}, false},
-		{"", "", "weekly", 1, Range{"2026-02-23", "2026-02-28"}, false},
-		{"", "", "monthly", 3, Range{"2025-12-01", "2026-02-28"}, false},
-		{"20260230", "", "daily", 0, Range{}, true}, {"2026-2-01", "", "daily", 0, Range{}, true}, {"20260301", "20260201", "daily", 0, Range{}, true}, {"20260301", "", "daily", 1, Range{}, true}, {"", "", "daily", -1, Range{}, true},
-	}
-	for _, c := range cases {
-		r, e := resolveRange(c.s, c.u, c.n, c.g, now, loc)
-		if (e != nil) != c.bad || !c.bad && r != c.want {
-			t.Errorf("%+v: got %+v, %v", c, r, e)
-		}
-	}
-	dst := time.Date(2026, 3, 9, 12, 0, 0, 0, loc)
-	r, e := resolveRange("", "", 2, "daily", dst, loc)
-	if e != nil || r.Since != "2026-03-08" {
-		t.Fatalf("DST range: %+v %v", r, e)
-	}
-}
 func TestOptions(t *testing.T) {
 	for _, args := range [][]string{{"--last", "0"}, {"--last", "2", "--since", "20260101"}, {"--timezone", "garbage"}, {"yearly"}, {"--since", "20260229"}} {
 		if _, e := options(args, time.Now()); e == nil {
@@ -106,19 +78,19 @@ func TestRejectOldShape(t *testing.T) {
 	}
 }
 func TestBackendArgs(t *testing.T) {
-	a := strings.Join(backendArgs(Range{"2026-01-01", ""}, "Pacific/Auckland"), " ")
+	a := strings.Join(backendArgs(datefilter.Range{Since: "2026-01-01"}, "Pacific/Auckland"), " ")
 	if strings.Contains(a, "--last") || strings.Contains(a, "--until") || !strings.Contains(a, "--timezone Pacific/Auckland") || !strings.Contains(a, "--sections daily,weekly,monthly,session") {
 		t.Fatal(a)
 	}
 }
 func TestMissingBackend(t *testing.T) {
-	_, e := load(context.Background(), "/this/does/not/exist", Range{}, "UTC")
+	_, e := load(context.Background(), "/this/does/not/exist", datefilter.Range{}, "UTC")
 	if e == nil || !strings.Contains(e.Error(), "--demo") {
 		t.Fatal(e)
 	}
 }
 func TestDemoAggregates(t *testing.T) {
-	s := demo(Range{"2026-09-01", "2026-09-30"}, time.UTC)
+	s := demo(datefilter.Range{Since: "2026-09-01", Until: "2026-09-30"}, time.UTC)
 	daily := total(s.Sections["daily"])
 	for _, g := range []string{"weekly", "monthly", "session"} {
 		u := total(s.Sections[g])
@@ -134,7 +106,7 @@ func TestDemoAggregates(t *testing.T) {
 	}
 }
 func fixtureModel() model {
-	o := Options{Group: "daily", TZ: "UTC", Demo: true, Range: Range{"2026-09-01", "2026-09-30"}}
+	o := Options{Group: "daily", TZ: "UTC", Demo: true, Range: datefilter.Range{Since: "2026-09-01", Until: "2026-09-30"}}
 	m := newModel(context.Background(), o)
 	m.s = demo(o.Range, time.UTC)
 	return m

@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -103,7 +103,7 @@ func TestExchangeCancellation(t *testing.T) {
 func TestExchangeFallbackAndStaleResult(t *testing.T) {
 	m := fixtureModel()
 	m.o.Currency = "EUR"
-	m.request = 2
+	m.fxRequest = 2
 	m.fxLoading = true
 	v, _ := m.Update(exchangeMsg{exchange: Exchange{Currency: "EUR", Rate: 0.86}, id: 1})
 	m = v.(model)

@@ -1,10 +1,11 @@
-package main
+package app
 
 import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/Kameleon21/tokenlens/internal/datefilter"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,7 +13,7 @@ import (
 
 type cachedMsg struct {
 	s  Snapshot
-	r  Range
+	r  datefilter.Range
 	id int
 }
 type diskSnapshot struct {
@@ -20,7 +21,7 @@ type diskSnapshot struct {
 	Snapshot Snapshot
 }
 
-func snapshotCachePath(o Options, r Range) (string, error) {
+func snapshotCachePath(o Options, r datefilter.Range) (string, error) {
 	dir := o.CacheDir
 	if dir == "" {
 		root, e := os.UserCacheDir()
@@ -32,7 +33,7 @@ func snapshotCachePath(o Options, r Range) (string, error) {
 	key := sha256.Sum256([]byte("v1\x00" + o.Bin + fmt.Sprint(o.Offline) + "\x00" + o.TZ + "\x00" + r.Since + "\x00" + r.Until))
 	return filepath.Join(dir, hex.EncodeToString(key[:])+".json"), nil
 }
-func readSnapshotCache(o Options, r Range) (Snapshot, error) {
+func readSnapshotCache(o Options, r datefilter.Range) (Snapshot, error) {
 	if o.NoCache || o.Demo {
 		return Snapshot{}, os.ErrNotExist
 	}
@@ -56,7 +57,7 @@ func readSnapshotCache(o Options, r Range) (Snapshot, error) {
 	}
 	return entry.Snapshot, nil
 }
-func writeSnapshotCache(o Options, r Range, s Snapshot) error {
+func writeSnapshotCache(o Options, r datefilter.Range, s Snapshot) error {
 	if o.NoCache || o.Demo {
 		return nil
 	}
@@ -84,4 +85,36 @@ func writeSnapshotCache(o Options, r Range, s Snapshot) error {
 		return e
 	}
 	return os.Rename(f.Name(), path)
+}
+
+// reusedMsg completes a request without invoking the backend.
+type reusedMsg struct {
+	s  Snapshot
+	r  datefilter.Range
+	id int
+}
+
+func snapshotFresh(s Snapshot, ttl time.Duration, now time.Time) bool {
+	age := now.Sub(s.Loaded)
+	return ttl > 0 && !s.Loaded.IsZero() && age >= 0 && age < ttl
+}
+
+func (m *model) remember(r datefilter.Range, s Snapshot) {
+	if m.o.NoCache || m.o.Demo {
+		return
+	}
+	if m.reports == nil {
+		m.reports = make(map[datefilter.Range]Snapshot)
+	}
+	if _, exists := m.reports[r]; !exists && len(m.reports) >= 16 {
+		var oldest datefilter.Range
+		var loaded time.Time
+		for key, report := range m.reports {
+			if loaded.IsZero() || report.Loaded.Before(loaded) {
+				oldest, loaded = key, report.Loaded
+			}
+		}
+		delete(m.reports, oldest)
+	}
+	m.reports[r] = s
 }
