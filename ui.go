@@ -1,0 +1,505 @@
+package main
+
+import (
+	"context"
+	"fmt"
+	"hash/fnv"
+	"sort"
+	"strings"
+	"time"
+	"unicode"
+
+	"github.com/charmbracelet/bubbles/spinner"
+	"github.com/charmbracelet/bubbles/textinput"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+)
+
+var ink = lipgloss.Color("#E3E9F3")
+var muted = lipgloss.NewStyle().Foreground(lipgloss.Color("#8794A9"))
+var accent = lipgloss.NewStyle().Foreground(lipgloss.Color("#80D8C3"))
+var bright = lipgloss.NewStyle().Foreground(ink).Bold(true)
+var views = []string{"Overview", "Agents", "Models", "Tokens / cache", "Sessions"}
+
+type loadedMsg struct {
+	s   Snapshot
+	err error
+	id  int
+	r   Range
+}
+type model struct {
+	ctx                                   context.Context
+	o                                     Options
+	s                                     Snapshot
+	width, height, view, cursor, sortMode int
+	cost, loading, details, help          bool
+	err                                   string
+	spin                                  spinner.Model
+	request                               int
+	cancel                                context.CancelFunc
+	pending                               Range
+	agent, modelFilter, editing           string
+	input                                 textinput.Model
+}
+
+func newModel(ctx context.Context, o Options) model {
+	sp := spinner.New()
+	sp.Spinner = spinner.Dot
+	sp.Style = accent
+	ti := textinput.New()
+	ti.CharLimit = 200
+	ti.Width = 55
+	return model{ctx: ctx, o: o, width: 100, height: 32, cost: true, spin: sp, input: ti}
+}
+func (m model) Init() tea.Cmd { return func() tea.Msg { return "initial-load" } }
+func (m *model) refresh(r Range) tea.Cmd {
+	if m.cancel != nil {
+		m.cancel()
+	}
+	ctx, cancel := context.WithTimeout(m.ctx, 2*time.Minute)
+	m.cancel = cancel
+	m.loading = true
+	m.err = ""
+	m.request++
+	id := m.request
+	o := m.o
+	m.pending = r
+	return tea.Batch(m.spin.Tick, func() tea.Msg {
+		defer cancel()
+		var s Snapshot
+		var e error
+		if o.Demo {
+			loc, _ := time.LoadLocation(o.TZ)
+			s = demo(r, loc)
+		} else {
+			s, e = load(ctx, o.Bin, r, o.TZ)
+		}
+		return loadedMsg{s, e, id, r}
+	})
+}
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch v := msg.(type) {
+	case string:
+		if v == "initial-load" {
+			return m, m.refresh(m.o.Range)
+		}
+	case tea.WindowSizeMsg:
+		m.width = v.Width
+		m.height = v.Height
+	case loadedMsg:
+		if v.id != m.request {
+			return m, nil
+		}
+		m.loading = false
+		if v.err != nil {
+			m.err = v.err.Error()
+		} else {
+			m.s = v.s
+			m.o.Range = v.r
+			m.cursor = 0
+			m.details = false
+		}
+	case tea.KeyMsg:
+		key := v.String()
+		if key == "ctrl+c" {
+			if m.cancel != nil {
+				m.cancel()
+			}
+			return m, tea.Quit
+		}
+		if m.editing != "" {
+			if key == "esc" {
+				m.editing = ""
+				m.input.Blur()
+				return m, nil
+			}
+			if key == "enter" {
+				parts := strings.Fields(m.input.Value())
+				loc, _ := time.LoadLocation(m.o.TZ)
+				var r Range
+				var e error
+				if len(parts) == 1 && parts[0] == "month" {
+					r, e = resolveRange("", "", 0, m.o.Group, time.Now(), loc)
+				} else if len(parts) == 2 && parts[0] == "last" {
+					var n int
+					if _, err := fmt.Sscanf(parts[1], "%d", &n); err != nil || n <= 0 || fmt.Sprint(n) != parts[1] {
+						e = fmt.Errorf("use last N with a positive integer")
+					} else {
+						r, e = resolveRange("", "", n, m.o.Group, time.Now(), loc)
+					}
+				} else if len(parts) == 2 {
+					s, u := parts[0], parts[1]
+					if s == "*" {
+						s = ""
+					}
+					if u == "*" {
+						u = ""
+					}
+					r, e = resolveRange(s, u, 0, m.o.Group, time.Now(), loc)
+				} else {
+					e = fmt.Errorf("enter two dates (use * for an open bound), month, or last N")
+				}
+				if e != nil {
+					m.err = e.Error()
+					return m, nil
+				}
+				m.editing = ""
+				m.input.Blur()
+				return m, m.refresh(r)
+			}
+			var cmd tea.Cmd
+			m.input, cmd = m.input.Update(msg)
+			return m, cmd
+		}
+		if key == "q" {
+			if m.cancel != nil {
+				m.cancel()
+			}
+			return m, tea.Quit
+		}
+		if key == "esc" {
+			m.details = false
+			m.help = false
+			m.err = ""
+			return m, nil
+		}
+		if key == "?" {
+			m.help = !m.help
+			return m, nil
+		}
+		if m.help {
+			return m, nil
+		}
+		switch key {
+		case "1", "2", "3", "4", "5":
+			m.view = int(key[0] - '1')
+			m.cursor = 0
+			m.details = false
+		case "tab":
+			m.view = (m.view + 1) % len(views)
+			m.cursor = 0
+			m.details = false
+		case "shift+tab":
+			m.view = (m.view + len(views) - 1) % len(views)
+			m.cursor = 0
+			m.details = false
+		case "d":
+			m.o.Group = "daily"
+			m.cursor = 0
+		case "w":
+			m.o.Group = "weekly"
+			m.cursor = 0
+		case "m":
+			m.o.Group = "monthly"
+			m.cursor = 0
+		case "c":
+			m.cost = !m.cost
+		case "s":
+			m.sortMode = (m.sortMode + 1) % 3
+			m.cursor = 0
+		case "j", "down":
+			if m.cursor < len(m.rows())-1 {
+				m.cursor++
+			}
+		case "k", "up":
+			if m.cursor > 0 {
+				m.cursor--
+			}
+		case "home", "g":
+			m.cursor = 0
+		case "end", "G":
+			m.cursor = max(0, len(m.rows())-1)
+		case "enter":
+			m.details = !m.details
+		case "a":
+			m.agent = cycle(names(m.s, "agent"), m.agent)
+			m.cursor = 0
+			m.details = false
+		case "f":
+			m.modelFilter = cycle(names(m.s, "model"), m.modelFilter)
+			m.cursor = 0
+			m.details = false
+		case "x":
+			m.agent = ""
+			m.modelFilter = ""
+			m.cursor = 0
+		case "r":
+			return m, m.refresh(m.o.Range)
+		case "t":
+			m.editing = "range"
+			m.input.SetValue(m.o.Range.Since + " " + m.o.Range.Until)
+			m.input.Focus()
+			return m, textinput.Blink
+		}
+	}
+	var cmd tea.Cmd
+	if m.loading {
+		m.spin, cmd = m.spin.Update(msg)
+	}
+	return m, cmd
+}
+func cycle(ss []string, s string) string {
+	for i, v := range ss {
+		if s == v {
+			return ss[(i+1)%len(ss)]
+		}
+	}
+	return ""
+}
+func (m model) rows() []Row {
+	raw := m.s.Sections[m.o.Group]
+	base := filtered(raw, m.agent, m.modelFilter)
+	var rows []Row
+	switch m.view {
+	case 0:
+		rows = base
+	case 1:
+		rows = rank(raw, "agents", m.agent, m.modelFilter)
+	case 2:
+		rows = rank(filtered(raw, m.agent, ""), "models", "", m.modelFilter)
+	case 3:
+		u := total(base)
+		rows = []Row{{Name: "Input", Usage: Usage{Tokens: u.Input}}, {Name: "Output", Usage: Usage{Tokens: u.Output}}, {Name: "Cache read", Usage: Usage{Tokens: u.Read}}, {Name: "Cache write", Usage: Usage{Tokens: u.Write}}}
+	case 4:
+		rows = filtered(m.s.Sections["session"], m.agent, m.modelFilter)
+	}
+	rows = append([]Row(nil), rows...)
+	sort.SliceStable(rows, func(i, j int) bool {
+		if m.sortMode == 2 {
+			return rows[i].Name < rows[j].Name
+		}
+		a, b := m.value(rows[i]), m.value(rows[j])
+		if a.Value == b.Value {
+			return rows[i].Name < rows[j].Name
+		}
+		if m.sortMode == 1 {
+			return a.Value < b.Value
+		}
+		return a.Value > b.Value
+	})
+	return rows
+}
+func (m model) value(r Row) Metric {
+	if m.cost && m.view != 3 {
+		return r.Usage.Cost
+	}
+	return r.Usage.Tokens
+}
+func number(v float64) string {
+	s := fmt.Sprintf("%.0f", v)
+	for i := len(s) - 3; i > 0; i -= 3 {
+		s = s[:i] + "," + s[i:]
+	}
+	return s
+}
+func format(v Metric, cost bool) string {
+	if !v.Known {
+		return "unavailable"
+	}
+	s := number(v.Value)
+	if cost {
+		s = fmt.Sprintf("$%.4f", v.Value)
+	}
+	if v.Partial {
+		s += " + ?"
+	}
+	return s
+}
+func safe(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || r == 0x1b {
+			return -1
+		}
+		return r
+	}, s)
+}
+func color(name string) lipgloss.Color {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(name))
+	p := []string{"#80D8C3", "#AFABED", "#E5B887", "#8CBFE5", "#D9A1BA", "#B8C990"}
+	return lipgloss.Color(p[int(h.Sum32())%len(p)])
+}
+func clip(s string, w int) string { return ansi.Truncate(s, max(1, w), "…") }
+func (m model) View() string {
+	if m.width < 50 || m.height < 16 {
+		return "Tokenlens\n\nResize to at least 50 × 16 for the dashboard.\nq quit"
+	}
+	w := min(m.width-4, 130)
+	var b strings.Builder
+	badge := "LOCAL"
+	if m.o.Demo {
+		badge = "DEMO · SYNTHETIC"
+	}
+	b.WriteString(bright.Render("◈  TOKENLENS") + "  " + muted.Render("/  usage, in focus") + "   " + accent.Render(badge) + "\n")
+	b.WriteString(muted.Render(clip(m.o.Range.String()+"  ·  "+m.o.TZ, w)) + "\n\n")
+	u := total(filtered(m.s.Sections["daily"], m.agent, m.modelFilter))
+	summary := "Tokens  " + bright.Render(format(u.Tokens, false)) + "    Estimated cost (USD)  " + accent.Render(format(u.Cost, true))
+	if m.s.Loaded.IsZero() {
+		summary = "Waiting for your first snapshot"
+	}
+	b.WriteString(clip(summary, w) + "\n")
+	fresh := "not loaded"
+	if !m.s.Loaded.IsZero() {
+		fresh = "snapshot " + m.s.Loaded.Local().Format("15:04:05")
+	}
+	if m.loading {
+		fresh = m.spin.View() + " loading " + m.pending.String() + " · " + fresh
+	}
+	b.WriteString(muted.Render(clip(fresh, w)) + "\n\n")
+	tabs := []string{}
+	for i, v := range views {
+		s := fmt.Sprintf("%d %s", i+1, v)
+		if i == m.view {
+			s = accent.Bold(true).Render(s)
+		} else {
+			s = muted.Render(s)
+		}
+		tabs = append(tabs, s)
+	}
+	if w < 88 {
+		b.WriteString(accent.Bold(true).Render(fmt.Sprintf("%d / %s", m.view+1, views[m.view])) + muted.Render("    tab switch view"))
+	} else {
+		b.WriteString(strings.Join(tabs, "   "))
+	}
+	b.WriteString("\n")
+	a, f := m.agent, m.modelFilter
+	if a == "" {
+		a = "all"
+	}
+	if f == "" {
+		f = "all"
+	}
+	b.WriteString(muted.Render(clip("Agent: "+safe(a)+"   Model: "+safe(f)+"   Group: "+m.o.Group, w)) + "\n")
+	b.WriteString(muted.Render(strings.Repeat("─", w)) + "\n")
+	if m.help {
+		b.WriteString(bright.Render("Make it yours") + "\n\n1–5 / tab   Overview, agents, models, tokens, sessions\nd / w / m   Change grouping instantly\na           Cycle agent filter\nf           Cycle model filter (independent of agent)\nx           Clear filters\nc           Toggle estimated cost / tokens\ns           Sort descending, ascending, or by name\n↑ ↓ / j k   Select row; home/end jump\nenter       Inspect selected row; esc closes\nt           Edit range: two dates, month, or last N\nr           Refresh snapshot (asynchronous)\nq / ctrl+c  Quit\n\nCost estimates use ccusage pricing, never subscription balance.")
+	} else if m.editing != "" {
+		b.WriteString(bright.Render("Change date range") + "\n\n" + m.input.View() + "\n\n" + muted.Render("YYYY-MM-DD YYYY-MM-DD · * for open bound\nmonth · last N (uses current grouping)\nenter apply · esc cancel"))
+		if m.err != "" {
+			b.WriteString("\n\n" + safe(m.err))
+		}
+	} else if m.err != "" {
+		b.WriteString(bright.Render("Could not refresh") + "\n\n" + lipgloss.NewStyle().Width(w).Render(safe(m.err)) + "\n\n" + muted.Render("r retry · t change range · esc return to previous snapshot"))
+	} else if m.details {
+		rows := m.rows()
+		if len(rows) > 0 {
+			r := rows[min(m.cursor, len(rows)-1)]
+			b.WriteString(bright.Render(clip(safe(r.Name), w)) + "\n\n")
+			for _, v := range []struct {
+				label string
+				v     Metric
+				c     bool
+			}{{"Total tokens", r.Usage.Tokens, false}, {"Estimated cost · USD", r.Usage.Cost, true}, {"Input", r.Usage.Input, false}, {"Output", r.Usage.Output, false}, {"Cache read", r.Usage.Read, false}, {"Cache write", r.Usage.Write, false}} {
+				b.WriteString(fmt.Sprintf("%-24s %s\n", v.label, format(v.v, v.c)))
+			}
+			if len(r.Models) > 0 {
+				ss := []string{}
+				for _, v := range r.Models {
+					ss = append(ss, safe(v.Name))
+				}
+				b.WriteString("\n" + muted.Render(clip("Models: "+strings.Join(ss, ", "), w)))
+			}
+			if len(r.Metadata) > 0 {
+				keys := []string{}
+				for k := range r.Metadata {
+					keys = append(keys, k)
+				}
+				sort.Strings(keys)
+				for _, k := range keys {
+					b.WriteString("\n" + muted.Render(clip(safe(k+": "+string(r.Metadata[k])), w)))
+				}
+			}
+			b.WriteString("\n\n" + muted.Render("esc / enter close · ↑ ↓ inspect another row"))
+		}
+	} else {
+		rows := m.rows()
+		metricLabel := "TOKENS"
+		if m.cost && m.view != 3 {
+			metricLabel = "EST. USD"
+		}
+		order := []string{"largest first", "smallest first", "name"}[m.sortMode]
+		heading := views[m.view]
+		if m.view == 0 {
+			heading = "Activity · " + m.o.Group
+		}
+		b.WriteString(bright.Render(heading) + muted.Render("  /  "+metricLabel+" · "+order) + "\n")
+		if m.view == 0 {
+			contributors := rank(m.s.Sections["daily"], "agents", m.agent, m.modelFilter)
+			sort.Slice(contributors, func(i, j int) bool { return contributors[i].Usage.Cost.Value > contributors[j].Usage.Cost.Value })
+			if len(contributors) > 0 {
+				c := contributors[0]
+				share := ""
+				if u.Cost.Known && u.Cost.Value > 0 && !u.Cost.Partial && !c.Usage.Cost.Partial {
+					share = fmt.Sprintf(" · %.1f%%", 100*c.Usage.Cost.Value/u.Cost.Value)
+				}
+				b.WriteString(muted.Render(clip("Biggest estimated cost: "+safe(c.Name)+" · "+format(c.Usage.Cost, true)+share, w)) + "\n")
+			} else {
+				b.WriteString(muted.Render("Agent cost breakdown unavailable") + "\n")
+			}
+		}
+		if m.view == 3 {
+			b.WriteString(muted.Render(clip("Reported token categories; category pricing unavailable.", w)) + "\n")
+		}
+		if len(rows) == 0 {
+			b.WriteString("\n" + bright.Render("No usage in this view") + "\n" + muted.Render("t change range · x clear filters · r refresh · --demo to explore"))
+		} else {
+			sum, maxV := Metric{}, 0.0
+			for _, r := range rows {
+				v := m.value(r)
+				sum.add(v)
+				maxV = max(maxV, v.Value)
+			}
+			slots := max(1, m.height-18)
+			start := max(0, m.cursor-slots+1)
+			end := min(len(rows), start+slots)
+			for i := start; i < end; i++ {
+				r := rows[i]
+				v := m.value(r)
+				labelWidth := min(32, max(12, w/3))
+				barWidth := max(2, w-labelWidth-34)
+				n := 0
+				if maxV > 0 && v.Known {
+					n = int(v.Value / maxV * float64(barWidth))
+				}
+				share := "    —"
+				if sum.Known && !sum.Partial && sum.Value > 0 && v.Known && !v.Partial {
+					share = fmt.Sprintf("%5.1f%%", 100*v.Value/sum.Value)
+				}
+				pointer := "  "
+				if i == m.cursor {
+					pointer = accent.Render("› ")
+				}
+				name := clip(safe(r.Name), labelWidth)
+				name += strings.Repeat(" ", max(0, labelWidth-ansi.StringWidth(name)))
+				c := color(r.Agent)
+				if r.Agent == "" {
+					c = color(r.Name)
+				}
+				if r.Agent == "all" {
+					c = lipgloss.Color("#80D8C3")
+				}
+				bar := lipgloss.NewStyle().Foreground(c).Render(strings.Repeat("━", n)) + muted.Render(strings.Repeat("·", barWidth-n))
+				b.WriteString(clip(pointer+name+"  "+bar+fmt.Sprintf("  %15s  %s", format(v, m.cost && m.view != 3), share), w) + "\n")
+			}
+			b.WriteString(muted.Render(fmt.Sprintf("\n%d–%d of %d  ·  enter details", start+1, end, len(rows))))
+			if sum.Partial {
+				b.WriteString(muted.Render(" · + ? = incomplete metrics"))
+			}
+		}
+	}
+	footer := muted.Render("1–5 views  c metric  s sort  a agent  f model  t range  r refresh  ? help  q quit")
+	content := b.String()
+	lines := strings.Split(content, "\n")
+	maxLines := m.height - 4
+	if len(lines) > maxLines {
+		lines = lines[:maxLines]
+		lines[maxLines-1] = muted.Render("… resize terminal to see more")
+	}
+	for i := range lines {
+		lines[i] = clip(lines[i], w)
+	}
+	content = strings.Join(lines, "\n")
+	content += strings.Repeat("\n", max(1, maxLines-len(lines)+1)) + clip(footer, w)
+	return lipgloss.NewStyle().Foreground(ink).Padding(1, 2).Render(content)
+}
