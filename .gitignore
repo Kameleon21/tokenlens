@@ -1,0 +1,5 @@
+/bin/
+/work/
+*.log
+.DS_Store
+coverage.out
