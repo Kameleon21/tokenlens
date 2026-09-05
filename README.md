@@ -2,7 +2,11 @@
 
 Your coding-agent usage, in focus. A native Go dashboard built with Bubble Tea, Lip Gloss, and Charm components, powered by structured ccusage JSON.
 
-![Tokenlens dashboard](docs/overview.png)
+![Tokenlens terminal walkthrough](docs/demo.gif)
+
+[Watch the MP4](docs/demo.mp4) · [View the recording tape](docs/demo.tape)
+
+*Recorded with synthetic demo data; no personal usage logs are shown.*
 
 ## Start
 
@@ -144,6 +148,17 @@ go build -o bin/tokenlens .
 Tests cover dates/DST, billing boundaries, dynamic filters, missing metrics, cache identity/privacy/expiry, backend selection, exchange-rate errors, ANSI layouts/themes, period inspection, and all export formats. Optional integration checks: `TOKENLENS_TEST_LIVE_FX=1 go test -run TestLiveExchangeOptIn -v` and `TOKENLENS_TEST_SNAPSHOT=/path/to/report.json go test -run TestRealSnapshotOptIn -v`. Keep private report files outside the repository.
 
 See [ccusage options](https://ccusage.com/guide/cli-options), [JSON examples](https://ccusage.com/guide/json-output), and [Bun executable caching](https://bun.sh/docs/pm/bunx).
+
+## Recording the demo
+
+The README walkthrough is recorded with [Charm VHS](https://github.com/charmbracelet/vhs). The reproducible tape is stored at `docs/demo.tape`. Install VHS and its recording dependencies (`ffmpeg` and `ttyd`), then run from the repository root:
+
+```sh
+go build -o bin/tokenlens .
+vhs docs/demo.tape
+```
+
+This generates `docs/demo.gif` for the animated README preview and `docs/demo.mp4` for video playback. The tape uses fixed dates, synthetic usage, and synthetic exchange rates; it does not read personal logs or contact ccusage. It demonstrates period inspection, model/token comparisons, agent filtering, cache usage, grouping, currency/theme switching, and export controls.
 
 ## License
 
