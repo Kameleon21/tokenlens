@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -28,7 +29,25 @@ type loadedMsg struct {
 	id  int
 	r   Range
 }
+type exchangeMsg struct {
+	exchange Exchange
+	err      error
+	id       int
+}
 type model struct {
+	compactNumbers                        bool
+	info                                  string
+	cached                                bool
+	loadingSince                          time.Time
+	dayCursor, preset                     int
+	showPlan, exporting                   bool
+	notice                                string
+	widget, layout                        int
+	activityDetail                        bool
+	fx                                    Exchange
+	fxLoading                             bool
+	fxErr                                 string
+	fxCancel                              context.CancelFunc
 	ctx                                   context.Context
 	o                                     Options
 	s                                     Snapshot
@@ -44,13 +63,16 @@ type model struct {
 }
 
 func newModel(ctx context.Context, o Options) model {
+	if o.Currency == "" {
+		o.Currency = "USD"
+	}
 	sp := spinner.New()
 	sp.Spinner = spinner.Dot
 	sp.Style = accent
 	ti := textinput.New()
 	ti.CharLimit = 200
 	ti.Width = 55
-	return model{ctx: ctx, o: o, width: 100, height: 32, cost: true, spin: sp, input: ti}
+	return model{ctx: ctx, o: o, width: 100, height: 32, cost: true, spin: sp, input: ti, fx: usdExchange()}
 }
 func (m model) Init() tea.Cmd { return func() tea.Msg { return "initial-load" } }
 func (m *model) refresh(r Range) tea.Cmd {
@@ -60,12 +82,21 @@ func (m *model) refresh(r Range) tea.Cmd {
 	ctx, cancel := context.WithTimeout(m.ctx, 2*time.Minute)
 	m.cancel = cancel
 	m.loading = true
+	m.loadingSince = time.Now()
 	m.err = ""
 	m.request++
 	id := m.request
 	o := m.o
 	m.pending = r
-	return tea.Batch(m.spin.Tick, func() tea.Msg {
+	fxCmd := m.refreshExchange()
+	cacheCmd := func() tea.Msg {
+		s, e := readSnapshotCache(o, r)
+		if e != nil {
+			return nil
+		}
+		return cachedMsg{s, r, id}
+	}
+	return tea.Batch(m.spin.Tick, fxCmd, cacheCmd, func() tea.Msg {
 		defer cancel()
 		var s Snapshot
 		var e error
@@ -73,7 +104,10 @@ func (m *model) refresh(r Range) tea.Cmd {
 			loc, _ := time.LoadLocation(o.TZ)
 			s = demo(r, loc)
 		} else {
-			s, e = load(ctx, o.Bin, r, o.TZ)
+			s, e = load(ctx, o.Bin, r, o.TZ, o.Offline)
+		}
+		if e == nil {
+			_ = writeSnapshotCache(o, r, s)
 		}
 		return loadedMsg{s, e, id, r}
 	})
@@ -84,9 +118,42 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if v == "initial-load" {
 			return m, m.refresh(m.o.Range)
 		}
+	case tea.MouseMsg:
+		if m.view == 0 && !m.activityDetail && !m.details && m.width >= 96 && m.height >= 32 && m.layout == 0 && v.Y >= 19 && v.Y < 16+(m.height-20)/2-1 && v.X >= 5 && v.X < (m.width-4)/2 {
+			rows := m.chartPeriods()
+			count := max(1, ((m.width-6)/2-6)/3)
+			start := max(0, min(m.dayCursor, max(0, len(rows)-1))-count+1)
+			m.dayCursor = min(max(0, len(rows)-1), start+(v.X-5)/3)
+			m.widget = 0
+		}
 	case tea.WindowSizeMsg:
 		m.width = v.Width
 		m.height = v.Height
+	case cachedMsg:
+		if v.id == m.request && m.loading {
+			m.s = v.s
+			m.o.Range = v.r
+			m.cached = true
+		}
+		return m, nil
+	case exportedMsg:
+		if v.err != nil {
+			m.notice = "Export failed: " + v.err.Error()
+		} else {
+			m.notice = "Saved " + v.path
+		}
+		return m, nil
+	case exchangeMsg:
+		if v.id != m.request {
+			return m, nil
+		}
+		m.fxLoading = false
+		if v.err != nil {
+			m.fxErr = v.err.Error()
+		} else {
+			m.fx = v.exchange
+			m.fxErr = ""
+		}
 	case loadedMsg:
 		if v.id != m.request {
 			return m, nil
@@ -96,6 +163,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = v.err.Error()
 		} else {
 			m.s = v.s
+			m.cached = false
 			m.o.Range = v.r
 			m.cursor = 0
 			m.details = false
@@ -106,7 +174,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cancel != nil {
 				m.cancel()
 			}
+			if m.fxCancel != nil {
+				m.fxCancel()
+			}
 			return m, tea.Quit
+		}
+		if m.exporting {
+			if key == "esc" || key == "q" {
+				m.exporting = false
+				return m, nil
+			}
+			formats := map[string]string{"1": "json", "2": "csv", "3": "svg", "4": "png"}
+			if format, ok := formats[key]; ok {
+				m.exporting = false
+				return m, m.exportCmd(format)
+			}
+			return m, nil
 		}
 		if m.editing != "" {
 			if key == "esc" {
@@ -156,10 +239,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.cancel != nil {
 				m.cancel()
 			}
+			if m.fxCancel != nil {
+				m.fxCancel()
+			}
 			return m, tea.Quit
 		}
 		if key == "esc" {
 			m.details = false
+			m.info = ""
+			m.activityDetail = false
 			m.help = false
 			m.err = ""
 			return m, nil
@@ -174,10 +262,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch key {
 		case "1", "2", "3", "4", "5":
 			m.view = int(key[0] - '1')
+			m.activityDetail = false
 			m.cursor = 0
 			m.details = false
 		case "tab":
 			m.view = (m.view + 1) % len(views)
+			m.activityDetail = false
 			m.cursor = 0
 			m.details = false
 		case "shift+tab":
@@ -210,8 +300,63 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cursor = 0
 		case "end", "G":
 			m.cursor = max(0, len(m.rows())-1)
+		case "n":
+			m.compactNumbers = !m.compactNumbers
+		case "e":
+			m.o.Currency = cycle([]string{"USD", "EUR", "GBP", "JPY"}, m.o.Currency)
+			return m, m.refresh(m.o.Range)
+		case "T":
+			m.o.Theme = cycle([]string{"dark", "light", "ascii"}, m.o.Theme)
+			applyTheme(m.o.Theme)
+		case "p":
+			m.preset = (m.preset + 1) % 4
+			m.notice = []string{"This calendar month", "This billing cycle", "Last 30 days", "Since August 1"}[m.preset]
+			return m, m.refresh(m.presetRange(m.preset))
+		case "b":
+			m.showPlan = !m.showPlan
+		case "o":
+			m.exporting = true
+		case "h":
+			m.info = "Hourly / 5-hour costs unavailable: ccusage unified JSON has no timed usage events. Daily, weekly, monthly are available."
+		case "left":
+			m.dayCursor = max(0, m.dayCursor-1)
+		case "right":
+			m.dayCursor = min(max(0, len(m.chartPeriods())-1), m.dayCursor+1)
+		case "[":
+			m.widget = (m.widget + 3) % 4
+		case "]":
+			m.widget = (m.widget + 1) % 4
+		case "v":
+			m.layout = (m.layout + 1) % 2
 		case "enter":
-			m.details = !m.details
+			if m.view == 0 && !m.activityDetail && m.width >= 96 && m.height >= 32 {
+				selectedPeriod := ""
+				periods := m.chartPeriods()
+				if m.widget == 0 && len(periods) > 0 {
+					selectedPeriod = periods[min(m.dayCursor, len(periods)-1)].Name
+				}
+				switch m.widget {
+				case 0:
+					m.activityDetail = true
+				case 1:
+					m.view = 2
+				case 2:
+					m.view = 4
+				case 3:
+					m.activityDetail = true
+				}
+				m.cursor = 0
+				if selectedPeriod != "" {
+					for i, r := range m.rows() {
+						if r.Name == selectedPeriod {
+							m.cursor = i
+							break
+						}
+					}
+				}
+			} else {
+				m.details = !m.details
+			}
 		case "a":
 			m.agent = cycle(names(m.s, "agent"), m.agent)
 			m.cursor = 0
@@ -314,18 +459,23 @@ func safe(s string) string {
 		return r
 	}, s)
 }
-func color(name string) lipgloss.Color {
+func color(name string) lipgloss.Color { return colorFor(name, activeTheme) }
+func colorFor(name, theme string) lipgloss.Color {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(name))
 	p := []string{"#80D8C3", "#AFABED", "#E5B887", "#8CBFE5", "#D9A1BA", "#B8C990"}
+	if theme == "light" {
+		p = []string{"#087E70", "#7156B2", "#9B601C", "#286D9B", "#A04773", "#5D7524"}
+	}
 	return lipgloss.Color(p[int(h.Sum32())%len(p)])
 }
 func clip(s string, w int) string { return ansi.Truncate(s, max(1, w), "…") }
-func (m model) View() string {
+func (m model) compactView() string {
 	if m.width < 50 || m.height < 16 {
 		return "Tokenlens\n\nResize to at least 50 × 16 for the dashboard.\nq quit"
 	}
-	w := min(m.width-4, 130)
+	w := m.width - 4
+	headerExtra := 0
 	var b strings.Builder
 	badge := "LOCAL"
 	if m.o.Demo {
@@ -334,19 +484,33 @@ func (m model) View() string {
 	b.WriteString(bright.Render("◈  TOKENLENS") + "  " + muted.Render("/  usage, in focus") + "   " + accent.Render(badge) + "\n")
 	b.WriteString(muted.Render(clip(m.o.Range.String()+"  ·  "+m.o.TZ, w)) + "\n\n")
 	u := total(filtered(m.s.Sections["daily"], m.agent, m.modelFilter))
-	summary := "Tokens  " + bright.Render(format(u.Tokens, false)) + "    Estimated cost (USD)  " + accent.Render(format(u.Cost, true))
+	summary := "Tokens  " + bright.Render(format(u.Tokens, false)) + "    Estimated cost (" + m.fx.Currency + ")  " + accent.Render(m.fx.format(u.Cost))
 	if m.s.Loaded.IsZero() {
 		summary = "Waiting for your first snapshot"
 	}
-	b.WriteString(clip(summary, w) + "\n")
+	if ansi.StringWidth(summary) > w && !m.s.Loaded.IsZero() {
+		b.WriteString("Tokens  " + bright.Render(format(u.Tokens, false)) + "\n" + "Estimated cost (" + m.fx.Currency + ")  " + accent.Render(m.fx.format(u.Cost)) + "\n")
+		headerExtra++
+	} else {
+		b.WriteString(clip(summary, w) + "\n")
+	}
 	fresh := "not loaded"
 	if !m.s.Loaded.IsZero() {
-		fresh = "snapshot " + m.s.Loaded.Local().Format("15:04:05")
+		fresh = "snapshot " + m.s.Loaded.Local().Format("Jan 02 15:04:05")
+		if m.cached {
+			fresh = "cached " + fresh
+		}
 	}
 	if m.loading {
 		fresh = m.spin.View() + " loading " + m.pending.String() + " · " + fresh
 	}
-	b.WriteString(muted.Render(clip(fresh, w)) + "\n\n")
+	b.WriteString(muted.Render(clip(fresh, w)) + "\n")
+	if m.o.Currency != "USD" {
+		status := muted.Width(w).Render(m.exchangeStatus())
+		b.WriteString(status + "\n")
+		headerExtra += lipgloss.Height(status)
+	}
+	b.WriteString("\n")
 	tabs := []string{}
 	for i, v := range views {
 		s := fmt.Sprintf("%d %s", i+1, v)
@@ -372,7 +536,11 @@ func (m model) View() string {
 	}
 	b.WriteString(muted.Render(clip("Agent: "+safe(a)+"   Model: "+safe(f)+"   Group: "+m.o.Group, w)) + "\n")
 	b.WriteString(muted.Render(strings.Repeat("─", w)) + "\n")
-	if m.help {
+	if m.info != "" {
+		b.WriteString("DATA AVAILABILITY\n\n" + m.info + "\n\nesc close")
+	} else if m.exporting {
+		b.WriteString("EXPORT FILTERED VIEW\n\n1 JSON    2 CSV    3 SVG    4 PNG\n\nesc cancel")
+	} else if m.help {
 		b.WriteString(bright.Render("Make it yours") + "\n\n1–5 / tab   Overview, agents, models, tokens, sessions\nd / w / m   Change grouping instantly\na           Cycle agent filter\nf           Cycle model filter (independent of agent)\nx           Clear filters\nc           Toggle estimated cost / tokens\ns           Sort descending, ascending, or by name\n↑ ↓ / j k   Select row; home/end jump\nenter       Inspect selected row; esc closes\nt           Edit range: two dates, month, or last N\nr           Refresh snapshot (asynchronous)\nq / ctrl+c  Quit\n\nCost estimates use ccusage pricing, never subscription balance.")
 	} else if m.editing != "" {
 		b.WriteString(bright.Render("Change date range") + "\n\n" + m.input.View() + "\n\n" + muted.Render("YYYY-MM-DD YYYY-MM-DD · * for open bound\nmonth · last N (uses current grouping)\nenter apply · esc cancel"))
@@ -390,8 +558,8 @@ func (m model) View() string {
 				label string
 				v     Metric
 				c     bool
-			}{{"Total tokens", r.Usage.Tokens, false}, {"Estimated cost · USD", r.Usage.Cost, true}, {"Input", r.Usage.Input, false}, {"Output", r.Usage.Output, false}, {"Cache read", r.Usage.Read, false}, {"Cache write", r.Usage.Write, false}} {
-				b.WriteString(fmt.Sprintf("%-24s %s\n", v.label, format(v.v, v.c)))
+			}{{"Total tokens", r.Usage.Tokens, false}, {"Estimated cost · " + m.fx.Currency, r.Usage.Cost, true}, {"Input", r.Usage.Input, false}, {"Output", r.Usage.Output, false}, {"Cache read", r.Usage.Read, false}, {"Cache write", r.Usage.Write, false}} {
+				b.WriteString(fmt.Sprintf("%-24s %s\n", v.label, m.formatMetric(v.v, v.c)))
 			}
 			if len(r.Models) > 0 {
 				ss := []string{}
@@ -416,7 +584,7 @@ func (m model) View() string {
 		rows := m.rows()
 		metricLabel := "TOKENS"
 		if m.cost && m.view != 3 {
-			metricLabel = "EST. USD"
+			metricLabel = "EST. " + m.fx.Currency
 		}
 		order := []string{"largest first", "smallest first", "name"}[m.sortMode]
 		heading := views[m.view]
@@ -433,7 +601,7 @@ func (m model) View() string {
 				if u.Cost.Known && u.Cost.Value > 0 && !u.Cost.Partial && !c.Usage.Cost.Partial {
 					share = fmt.Sprintf(" · %.1f%%", 100*c.Usage.Cost.Value/u.Cost.Value)
 				}
-				b.WriteString(muted.Render(clip("Biggest estimated cost: "+safe(c.Name)+" · "+format(c.Usage.Cost, true)+share, w)) + "\n")
+				b.WriteString(muted.Render(clip("Biggest estimated cost: "+safe(c.Name)+" · "+m.fx.format(c.Usage.Cost)+share, w)) + "\n")
 			} else {
 				b.WriteString(muted.Render("Agent cost breakdown unavailable") + "\n")
 			}
@@ -450,7 +618,7 @@ func (m model) View() string {
 				sum.add(v)
 				maxV = max(maxV, v.Value)
 			}
-			slots := max(1, m.height-18)
+			slots := max(1, m.height-18-headerExtra)
 			start := max(0, m.cursor-slots+1)
 			end := min(len(rows), start+slots)
 			for i := start; i < end; i++ {
@@ -480,7 +648,7 @@ func (m model) View() string {
 					c = lipgloss.Color("#80D8C3")
 				}
 				bar := lipgloss.NewStyle().Foreground(c).Render(strings.Repeat("━", n)) + muted.Render(strings.Repeat("·", barWidth-n))
-				b.WriteString(clip(pointer+name+"  "+bar+fmt.Sprintf("  %15s  %s", format(v, m.cost && m.view != 3), share), w) + "\n")
+				b.WriteString(clip(pointer+name+"  "+bar+fmt.Sprintf("  %15s  %s", m.formatMetric(v, m.cost && m.view != 3), share), w) + "\n")
 			}
 			b.WriteString(muted.Render(fmt.Sprintf("\n%d–%d of %d  ·  enter details", start+1, end, len(rows))))
 			if sum.Partial {
@@ -501,5 +669,72 @@ func (m model) View() string {
 	}
 	content = strings.Join(lines, "\n")
 	content += strings.Repeat("\n", max(1, maxLines-len(lines)+1)) + clip(footer, w)
-	return lipgloss.NewStyle().Foreground(ink).Padding(1, 2).Render(content)
+	return themeRender(lipgloss.NewStyle().Foreground(ink).Padding(1, 2).Render(content), m.o.Theme, m.width, m.height)
+}
+
+func (m *model) refreshExchange() tea.Cmd {
+	if m.fxCancel != nil {
+		m.fxCancel()
+	}
+	if m.o.Currency == "USD" {
+		m.fx = usdExchange()
+		m.fxLoading = false
+		m.fxErr = ""
+		return nil
+	}
+	m.fxLoading = true
+	m.fxErr = ""
+	ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+	m.fxCancel = cancel
+	currency, id, demoMode := m.o.Currency, m.request, m.o.Demo
+	return func() tea.Msg {
+		defer cancel()
+		if demoMode {
+			return exchangeMsg{exchange: Exchange{Currency: currency, Rate: 0.9, Date: "sample", Source: "synthetic demo rate"}, id: id}
+		}
+		x, err := fetchExchange(ctx, &http.Client{Timeout: 10 * time.Second}, exchangeEndpoint, currency)
+		return exchangeMsg{exchange: x, err: err, id: id}
+	}
+}
+func (m model) formatMetric(v Metric, cost bool) string {
+	if cost {
+		return m.fx.format(v)
+	}
+	if m.compactNumbers && v.Known {
+		suffix := ""
+		number := v.Value
+		if number >= 1e9 {
+			number /= 1e9
+			suffix = "B"
+		} else if number >= 1e6 {
+			number /= 1e6
+			suffix = "M"
+		} else if number >= 1e3 {
+			number /= 1e3
+			suffix = "k"
+		}
+		if suffix != "" {
+			s := fmt.Sprintf("%.2f%s", number, suffix)
+			if v.Partial {
+				s += " + ?"
+			}
+			return s
+		}
+	}
+	return format(v, false)
+}
+func (m model) exchangeStatus() string {
+	if m.fx.Currency == "USD" {
+		if m.fxLoading {
+			return "FX  fetching " + m.o.Currency + " rate · showing USD until ready"
+		}
+		return "FX  unavailable for " + m.o.Currency + " · showing USD · r retry"
+	}
+	s := m.fx.label()
+	if m.fxErr != "" {
+		s += " · refresh failed; previous rate"
+	} else if m.fxLoading {
+		s += " · refreshing"
+	}
+	return s
 }
