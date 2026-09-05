@@ -1,23 +1,24 @@
-package main
+package app
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/Kameleon21/tokenlens/internal/datefilter"
 	"time"
 )
 
 func known(v float64) Metric { return Metric{Value: v, Known: true} }
 
 // Deterministic synthetic data; never reads local agent logs.
-func demo(r Range, loc *time.Location) Snapshot {
+func demo(r datefilter.Range, loc *time.Location) Snapshot {
 	s := Snapshot{Sections: map[string][]Row{}, Loaded: time.Now()}
 	start := time.Date(2026, 9, 1, 0, 0, 0, 0, loc)
 	end := start.AddDate(0, 1, -1)
 	if r.Since != "" {
-		start, _ = parseDate(r.Since, loc)
+		start, _ = datefilter.Parse(r.Since, loc)
 	}
 	if r.Until != "" {
-		end, _ = parseDate(r.Until, loc)
+		end, _ = datefilter.Parse(r.Until, loc)
 	} else {
 		end = start.AddDate(0, 1, -1)
 	}

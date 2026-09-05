@@ -24,4 +24,4 @@ This would make Tokenlens own ingestion, storage, and querying as well as visual
 
 Measure first-ever startup, startup with installed backend, warm restart, return to a visited range, unseen range, forced refresh, and currency switch separately. Record time to first visible report and time to updated data; these are different outcomes. Use synthetic fixtures for automated tests and do not commit private reports or machine-specific timing promises.
 
-`go test -run TestRecentReportSkipsBackend -v` verifies disk and memory reuse with a nonexistent backend, so a pass proves those paths do not need ccusage. The full suite also checks freshness boundaries, bounded memory, stale-response rejection, refresh deduplication, and currency isolation.
+`go test ./internal/app -run TestRecentReportSkipsBackend -v` verifies disk and memory reuse with a nonexistent backend, so a pass proves those paths do not need ccusage. The full suite also checks freshness boundaries, bounded memory, stale-response rejection, refresh deduplication, and currency isolation.

@@ -1,7 +1,8 @@
-package main
+package app
 
 import (
 	"fmt"
+	"github.com/Kameleon21/tokenlens/internal/datefilter"
 	"strings"
 	"time"
 
@@ -61,23 +62,23 @@ func billingDate(y int, mo time.Month, day int, loc *time.Location) time.Time {
 	last := time.Date(y, mo+1, 0, 0, 0, 0, 0, loc).Day()
 	return time.Date(y, mo, min(day, last), 0, 0, 0, 0, loc)
 }
-func (m model) presetRange(index int) Range {
+func (m model) presetRange(index int) datefilter.Range {
 	loc, _ := time.LoadLocation(m.o.TZ)
 	now := time.Now().In(loc)
 	today := now.Format("2006-01-02")
 	switch index {
 	case 1:
-		return Range{billingStart(now, m.o.BillingDay).Format("2006-01-02"), today}
+		return datefilter.Range{Since: billingStart(now, m.o.BillingDay).Format("2006-01-02"), Until: today}
 	case 2:
-		return Range{now.AddDate(0, 0, -29).Format("2006-01-02"), today}
+		return datefilter.Range{Since: now.AddDate(0, 0, -29).Format("2006-01-02"), Until: today}
 	case 3:
 		y := now.Year()
 		if now.Month() < time.August {
 			y--
 		}
-		return Range{fmt.Sprintf("%d-08-01", y), today}
+		return datefilter.Range{Since: fmt.Sprintf("%d-08-01", y), Until: today}
 	}
-	r, _ := resolveRange("", "", 0, m.o.Group, now, loc)
+	r, _ := datefilter.Resolve("", "", 0, m.o.Group, now, loc)
 	return r
 }
 func (m model) planSummary() string {

@@ -1,7 +1,7 @@
 # Run from the repository root after: go build -o bin/tokenlens .
 # Synthetic data only; no ccusage, exchange-rate requests, or personal logs.
-Output docs/demo.gif
-Output docs/demo.mp4
+Output docs/assets/demo.gif
+Output docs/assets/demo.mp4
 
 Set Shell bash
 Set FontSize 18

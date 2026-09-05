@@ -1,4 +1,4 @@
-package main
+package datefilter
 
 import (
 	"fmt"
@@ -6,9 +6,11 @@ import (
 	_ "time/tzdata"
 )
 
+// Range holds inclusive ISO calendar dates; an empty bound is open.
 type Range struct{ Since, Until string }
 
-func parseDate(s string, loc *time.Location) (time.Time, error) {
+// Parse accepts compact or ISO dates in the supplied timezone.
+func Parse(s string, loc *time.Location) (time.Time, error) {
 	layout := "2006-01-02"
 	if len(s) == 8 {
 		layout = "20060102"
@@ -21,7 +23,9 @@ func parseDate(s string, loc *time.Location) (time.Time, error) {
 	}
 	return t, nil
 }
-func resolveRange(since, until string, last int, group string, now time.Time, loc *time.Location) (Range, error) {
+
+// Resolve validates bounds or computes a calendar range for the chosen grouping.
+func Resolve(since, until string, last int, group string, now time.Time, loc *time.Location) (Range, error) {
 	if last < 0 || last > 10000 {
 		return Range{}, fmt.Errorf("--last must be between 1 and 10000")
 	}
@@ -51,7 +55,7 @@ func resolveRange(since, until string, last int, group string, now time.Time, lo
 		if s == "" {
 			continue
 		}
-		t, e := parseDate(s, loc)
+		t, e := Parse(s, loc)
 		if e != nil {
 			return r, e
 		}

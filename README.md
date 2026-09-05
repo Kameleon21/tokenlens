@@ -1,8 +1,12 @@
 # Tokenlens
 
+<p align="center">
+  <img src="docs/assets/mascot-lensbot.png" width="220" alt="Tokenlens mascot: a mint lens robot inspecting a lavender token tile">
+</p>
+
 See your coding-agent token usage and estimated costs in your terminal. Compare agents and models, explore dates, and export reports.
 
-![Tokenlens demo](docs/demo.gif)
+![Tokenlens demo](docs/assets/demo.gif)
 
 *The demo uses made-up data.*
 

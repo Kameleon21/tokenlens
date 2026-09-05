@@ -32,6 +32,20 @@ Maintainers review and merge changes. Passing CI is required by this contributio
 
 ## Project layout
 
-Keep the single root Go package for now. `main.go` handles startup; `data.go` and `backend_*.go` integrate ccusage; `cache.go` stores reports; `dates.go` and `currency.go` handle dates and conversion; UI files render the dashboard; `export.go` writes exports. Tests live beside the code, and longer documentation belongs in `docs/`.
+```text
+main.go                 Small executable entry point; preserves go install
+internal/
+  app/                  Startup, ccusage adapter, caching, terminal UI, exports
+    *_test.go           App and backend-flow tests beside the implementation
+  datefilter/           Date parsing and calendar ranges
+    range_test.go       Date, timezone, and DST tests
+docs/
+  assets/               README mascot, screenshots, and demo media
+  usage.md              Detailed user guide
+  performance.md        Loading behavior and future native indexing plan
+.github/
+  workflows/            Automated checks
+  pull_request_template.md
+```
 
-Extract an `internal/usage` package when a second data provider needs a shared model, and `internal/store` when persistent indexing has its own lifecycle. Avoid a public `pkg/` API until another project needs it. Keep the root executable so `go install github.com/Kameleon21/tokenlens@latest` continues to work.
+Keep tests beside their packages, as is conventional in Go. Use a package's `testdata/` directory if file-based fixtures are needed. The date package has no UI or backend dependencies. The app package owns orchestration and presentation; split providers or persistent indexing into additional internal packages when they gain an independent lifecycle. Avoid a public `pkg/` API until another project needs it.

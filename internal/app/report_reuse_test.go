@@ -1,7 +1,8 @@
-package main
+package app
 
 import (
 	"context"
+	"github.com/Kameleon21/tokenlens/internal/datefilter"
 	tea "github.com/charmbracelet/bubbletea"
 	"testing"
 	"time"
@@ -83,7 +84,7 @@ func TestRefreshInFlightAndCurrencyIsolation(t *testing.T) {
 	if n.fxCancel != nil {
 		n.fxCancel()
 	}
-	next, _ = n.Update(reusedMsg{Snapshot{}, Range{}, 6})
+	next, _ = n.Update(reusedMsg{Snapshot{}, datefilter.Range{}, 6})
 	if next.(model).request != 7 || !next.(model).loading {
 		t.Fatal("stale cache response accepted")
 	}
@@ -92,14 +93,14 @@ func TestRefreshInFlightAndCurrencyIsolation(t *testing.T) {
 func TestReportMemoryBoundAndNoCache(t *testing.T) {
 	m := newModel(context.Background(), Options{})
 	for i := 0; i < 20; i++ {
-		m.remember(Range{Since: time.Unix(int64(i), 0).String()}, Snapshot{Loaded: time.Unix(int64(i+1), 0)})
+		m.remember(datefilter.Range{Since: time.Unix(int64(i), 0).String()}, Snapshot{Loaded: time.Unix(int64(i+1), 0)})
 	}
 	if len(m.reports) != 16 {
 		t.Fatal("memory cache not bounded")
 	}
 	m.o.NoCache = true
-	m.remember(Range{Since: "disabled"}, Snapshot{})
-	if _, ok := m.reports[Range{Since: "disabled"}]; ok {
+	m.remember(datefilter.Range{Since: "disabled"}, Snapshot{})
+	if _, ok := m.reports[datefilter.Range{Since: "disabled"}]; ok {
 		t.Fatal("no-cache ignored")
 	}
 }

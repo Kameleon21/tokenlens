@@ -1,8 +1,9 @@
-package main
+package app
 
 import (
 	"context"
 	"fmt"
+	"github.com/Kameleon21/tokenlens/internal/datefilter"
 	"hash/fnv"
 	"net/http"
 	"sort"
@@ -27,7 +28,7 @@ type loadedMsg struct {
 	s   Snapshot
 	err error
 	id  int
-	r   Range
+	r   datefilter.Range
 }
 type exchangeMsg struct {
 	exchange Exchange
@@ -35,7 +36,7 @@ type exchangeMsg struct {
 	id       int
 }
 type model struct {
-	reports                               map[Range]Snapshot
+	reports                               map[datefilter.Range]Snapshot
 	fxRequest                             int
 	compactNumbers                        bool
 	info                                  string
@@ -59,7 +60,7 @@ type model struct {
 	spin                                  spinner.Model
 	request                               int
 	cancel                                context.CancelFunc
-	pending                               Range
+	pending                               datefilter.Range
 	agent, modelFilter, editing           string
 	input                                 textinput.Model
 }
@@ -77,7 +78,7 @@ func newModel(ctx context.Context, o Options) model {
 	return model{ctx: ctx, o: o, width: 100, height: 32, cost: true, spin: sp, input: ti, fx: usdExchange()}
 }
 func (m model) Init() tea.Cmd { return func() tea.Msg { return "initial-load" } }
-func (m *model) refresh(r Range, force ...bool) tea.Cmd {
+func (m *model) refresh(r datefilter.Range, force ...bool) tea.Cmd {
 	// Repeated refresh presses must not restart an already running report.
 	if m.loading && m.pending == r {
 		return nil
@@ -227,16 +228,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if key == "enter" {
 				parts := strings.Fields(m.input.Value())
 				loc, _ := time.LoadLocation(m.o.TZ)
-				var r Range
+				var r datefilter.Range
 				var e error
 				if len(parts) == 1 && parts[0] == "month" {
-					r, e = resolveRange("", "", 0, m.o.Group, time.Now(), loc)
+					r, e = datefilter.Resolve("", "", 0, m.o.Group, time.Now(), loc)
 				} else if len(parts) == 2 && parts[0] == "last" {
 					var n int
 					if _, err := fmt.Sscanf(parts[1], "%d", &n); err != nil || n <= 0 || fmt.Sprint(n) != parts[1] {
 						e = fmt.Errorf("use last N with a positive integer")
 					} else {
-						r, e = resolveRange("", "", n, m.o.Group, time.Now(), loc)
+						r, e = datefilter.Resolve("", "", n, m.o.Group, time.Now(), loc)
 					}
 				} else if len(parts) == 2 {
 					s, u := parts[0], parts[1]
@@ -246,7 +247,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if u == "*" {
 						u = ""
 					}
-					r, e = resolveRange(s, u, 0, m.o.Group, time.Now(), loc)
+					r, e = datefilter.Resolve(s, u, 0, m.o.Group, time.Now(), loc)
 				} else {
 					e = fmt.Errorf("enter two dates (use * for an open bound), month, or last N")
 				}

@@ -1,10 +1,11 @@
-package main
+package app
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/Kameleon21/tokenlens/internal/datefilter"
 	"os/exec"
 	"sort"
 	"time"
@@ -133,7 +134,7 @@ func parseSnapshot(b []byte) (Snapshot, error) {
 	}
 	return s, nil
 }
-func backendArgs(r Range, tz string) []string {
+func backendArgs(r datefilter.Range, tz string) []string {
 	a := []string{"daily", "--sections", "daily,weekly,monthly,session", "--by-agent", "--json", "--timezone", tz}
 	if r.Since != "" {
 		a = append(a, "--since", r.Since)
@@ -143,7 +144,7 @@ func backendArgs(r Range, tz string) []string {
 	}
 	return a
 }
-func load(ctx context.Context, bin string, r Range, tz string, offline ...bool) (Snapshot, error) {
+func load(ctx context.Context, bin string, r datefilter.Range, tz string, offline ...bool) (Snapshot, error) {
 	path, prefix, e := backendCommand(bin)
 	if e != nil {
 		return Snapshot{}, e
