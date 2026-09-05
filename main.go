@@ -6,18 +6,29 @@ import (
 	"flag"
 	"fmt"
 	tea "github.com/charmbracelet/bubbletea"
+	"math"
 	"os"
 	"time"
 )
 
 type Options struct {
-	Group, TZ, Bin string
-	Range          Range
-	Demo           bool
+	Offline                                   bool
+	CacheDir                                  string
+	NoCache                                   bool
+	Theme, ExportDir, PlanAgent, PlanCurrency string
+	PlanCost                                  float64
+	BillingDay                                int
+	Group, TZ, Bin                            string
+	Currency                                  string
+	Range                                     Range
+	Demo                                      bool
 }
 
 func options(args []string, now time.Time) (Options, error) {
-	o := Options{Group: "daily", TZ: "UTC", Bin: "ccusage"}
+	o := Options{Group: "daily", TZ: "UTC", Bin: "ccusage", Currency: "USD"}
+	if c := os.Getenv("TOKENLENS_CURRENCY"); c != "" {
+		o.Currency = c
+	}
 	if tz := os.Getenv("TZ"); tz != "" {
 		o.TZ = tz
 	}
@@ -33,9 +44,18 @@ func options(args []string, now time.Time) (Options, error) {
 	f.IntVar(&last, "last", 0, "last N periods including current; cannot combine with date bounds")
 	f.StringVar(&o.TZ, "timezone", o.TZ, "IANA timezone (default UTC, or TZ environment variable)")
 	f.StringVar(&o.Bin, "ccusage", "ccusage", "ccusage executable path")
+	f.StringVar(&o.CacheDir, "cache-dir", "", "snapshot cache directory (default OS user cache / tokenlens)")
+	f.BoolVar(&o.Offline, "offline", false, "use ccusage cached pricing for speed (estimates may differ)")
+	f.BoolVar(&o.NoCache, "no-cache", false, "disable on-disk usage snapshots")
+	f.StringVar(&o.Theme, "theme", "dark", "dark, light, or ascii")
+	f.StringVar(&o.ExportDir, "export-dir", "exports", "directory for filtered CSV/JSON/SVG/PNG exports")
+	f.Float64Var(&o.PlanCost, "plan-cost", 0, "configured monthly plan price in startup display currency")
+	f.StringVar(&o.PlanAgent, "plan-agent", "", "agent covered by your plan, e.g. claude")
+	f.IntVar(&o.BillingDay, "billing-day", 1, "monthly billing start day (1–31, clamped in shorter months)")
+	f.StringVar(&o.Currency, "currency", o.Currency, "display currency (e.g. EUR); default TOKENLENS_CURRENCY or USD; fetches ECB reference rate")
 	f.BoolVar(&o.Demo, "demo", false, "clearly labeled synthetic demo; no backend needed")
 	f.Usage = func() {
-		fmt.Fprint(f.Output(), "Tokenlens — a local lens on agent usage\n\nUsage: tokenlens [daily|weekly|monthly] [flags]\n\nNo range flags: current calendar month. Costs are estimates in USD.\n")
+		fmt.Fprint(f.Output(), "Tokenlens — a local lens on agent usage\n\nUsage: tokenlens [daily|weekly|monthly] [flags]\n\nNo range flags: current calendar month. Costs originate in USD; --currency converts display amounts.\n")
 		f.PrintDefaults()
 	}
 	if e := f.Parse(args); e != nil {
@@ -53,6 +73,21 @@ func options(args []string, now time.Time) (Options, error) {
 	if hasLast && last == 0 {
 		return o, fmt.Errorf("--last must be between 1 and 10000")
 	}
+	if o.Theme != "dark" && o.Theme != "light" && o.Theme != "ascii" {
+		return o, fmt.Errorf("--theme must be dark, light, or ascii")
+	}
+	if o.PlanCost < 0 || math.IsNaN(o.PlanCost) || math.IsInf(o.PlanCost, 0) {
+		return o, fmt.Errorf("--plan-cost must be a finite nonnegative amount")
+	}
+	if o.BillingDay < 1 || o.BillingDay > 31 {
+		return o, fmt.Errorf("--billing-day must be 1–31")
+	}
+	currency, e := currencyCode(o.Currency)
+	if e != nil {
+		return o, e
+	}
+	o.Currency = currency
+	o.PlanCurrency = currency
 	loc, e := time.LoadLocation(o.TZ)
 	if e != nil {
 		return o, fmt.Errorf("invalid timezone %q", o.TZ)
@@ -69,9 +104,10 @@ func main() {
 		fmt.Fprintln(os.Stderr, e)
 		os.Exit(2)
 	}
+	applyTheme(o.Theme)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	if _, e = tea.NewProgram(newModel(ctx, o), tea.WithAltScreen()).Run(); e != nil {
+	if _, e = tea.NewProgram(newModel(ctx, o), tea.WithAltScreen(), tea.WithMouseAllMotion()).Run(); e != nil {
 		fmt.Fprintln(os.Stderr, e)
 		os.Exit(1)
 	}

@@ -1,74 +1,140 @@
 # Tokenlens
 
-A calm, keyboard-driven terminal dashboard for your coding-agent usage. Built in Go with Bubble Tea, Lip Gloss, and Charm components. Local data, exact numbers, one snapshot.
+Your coding-agent usage, in focus. A native Go dashboard built with Bubble Tea, Lip Gloss, and Charm components, powered by structured ccusage JSON.
 
-![Tokenlens overview](docs/overview.png)
+![Tokenlens terminal walkthrough](docs/demo.gif)
 
-## Run
+[Watch the MP4](docs/demo.mp4) · [View the recording tape](docs/demo.tape)
 
-Requires **Go 1.25+** to build and a locally installed **ccusage with unified `--sections` and `--by-agent` support**. Verified against the released **ccusage 20.0.20** native executable, including its actual JSON output. Older Claude-only releases are not supported. Tokenlens is a native Go application; it does not run npm/npx/bunx at runtime.
+*Recorded with synthetic demo data; no personal usage logs are shown.*
 
-Install the backend following [ccusage installation](https://ccusage.com/guide/installation). One available method is `npm install -g ccusage@20.0.20` (Node/npm are needed for that installation method, including its optional native platform dependency). Verify with `ccusage --version` and `ccusage daily --help`.
+## Start
+
+Requires **Go 1.25+**, and either **Bun** or a compatible **ccusage** executable on PATH.
+
+```sh
+go run . --currency EUR
+```
+
+Run this from the project directory. Use **`go run .`**, not `go run main.go`: the application spans multiple Go files.
+
+Tokenlens prefers an installed `ccusage`. Otherwise it automatically runs **`bunx --bun ccusage@20.0.20`**. Bun downloads the pinned backend into its shared local cache on first use; you do **not** need `npm install -g ccusage`. That first download needs network access and can take longer. The CLI and actual JSON shape were verified with ccusage 20.0.20, and automatic launch was verified with Bun 1.3.5. See [Bun installation](https://bun.sh/docs/installation) if `bunx` is unavailable.
+
+To preview without Bun, ccusage, or usage logs:
+
+```sh
+go run . --demo --currency EUR
+```
+
+Demo data and its exchange rate are synthetic and visibly labeled. For a binary you can run without recompiling:
 
 ```sh
 go build -o bin/tokenlens .
-./bin/tokenlens --demo                  # synthetic data; no ccusage required
-./bin/tokenlens                         # current calendar month, overview
-./bin/tokenlens weekly                  # same range, initially weekly
-./bin/tokenlens monthly --last 3        # current and previous two months
-./bin/tokenlens daily --last 7 --timezone Europe/Dublin
-./bin/tokenlens --since 20260901 --until 2026-09-30
-./bin/tokenlens --since 20260101         # open upper bound; no month default
-./bin/tokenlens --ccusage /path/to/ccusage
+./bin/tokenlens --currency EUR
 ```
 
-Optionally put the binary on your PATH. `tokenlens --help` lists options. The default timezone is **UTC**, or the `TZ` environment variable when set. Use `--timezone` explicitly for local calendar boundaries. IANA timezone data is embedded in the binary.
+Other examples:
 
-## Explore
+```sh
+go run . weekly --last 8 --currency EUR --timezone Europe/Dublin
+go run . monthly --since 20260101 --currency GBP
+go run . --since 20260901 --until 2026-09-30
+go run . --ccusage /path/to/ccusage
+go run . --theme light
+go run . --currency EUR --plan-cost 100 --plan-agent claude --billing-day 15
+```
 
-- **Overview:** persistent token and estimated USD totals, ranked period activity, biggest agent cost contributor.
-- **Agents / Models:** independent dynamic rankings, including any source or model returned by ccusage.
-- **Tokens / cache:** input, output, cache read, and cache write counts.
-- **Sessions:** ranked sessions with Enter details and backend metadata.
+## Dashboard
+
+Wide terminals show summary cards and a two-column widget grid, expanding to use the window. Smaller terminals use a compact ranked view. Minimum size is **50×16**; **150×45** or larger gives the charts room.
+
+- **Spend & model split:** stacked bars grouped by day, week, or month; model colors stay consistent. Arrow keys or mouse motion select a period, and Enter opens its exact values.
+- **Model comparison:** proportional ring and ranked bars with exact estimated costs or token counts.
+- **Sessions & repository cost:** session rankings; repository grouping is used only when every selected session has explicit repository/working-directory metadata. Otherwise the widget states that repository attribution is unavailable.
+- **Activity by agent:** per-agent daily activity, scoped to the displayed date window. This is daily usage, not a claim about coding hours.
+- **Tokens / cache:** input, output, cache read/write, proportional cache ring, and a cache-read progress bar.
+
+All available agent and model names are discovered dynamically. Agent and model filters are independent. Exact numbers and percentages accompany the charts. Missing metrics display **unavailable**; incomplete sums display **`+ ?`**, with misleading percentages suppressed.
+
+## Controls
 
 | Key | Action |
 | --- | --- |
-| `1`–`5`, `tab` / `shift+tab` | Switch view |
+| `1`–`5`, `tab` / `shift+tab` | Overview, agents, models, tokens/cache, sessions |
 | `d` / `w` / `m` | Daily / weekly / monthly grouping |
-| `c` | Estimated cost / token metric |
-| `s` | Sort largest, smallest, or name |
-| `↑` / `↓`, `j` / `k` | Select row and scroll |
-| `home` / `end`, `g` / `G` | First / last row |
-| `enter` | Open / close selected row details |
-| `a` | Cycle agent filter |
-| `f` | Cycle model filter independently |
-| `x` | Clear both filters |
-| `t` | Edit range: `2026-09-01 2026-09-30`, `* 2026-09-30`, `month`, or `last 7` |
-| `r` | Refresh the snapshot |
-| `?` | Help |
-| `esc` | Close editor, help, error, or details |
+| `←` / `→`, mouse over stacked chart | Inspect a period |
+| `[` / `]`, `enter` | Focus / open overview widget |
+| `v` | Switch grid layout |
+| `↑` / `↓`, `j` / `k`, `home` / `end` | Navigate ranked rows |
+| `a` / `f`, `x` | Cycle agent / model filter; clear filters |
+| `n` | Toggle compact k/M/B token labels (inspector remains exact) |
+| `c` / `s` | Cost vs. tokens; descending / ascending / name sorting |
+| `e` | Cycle USD, EUR, GBP, JPY |
+| `T` | Dark, light, terminal ASCII theme |
+| `t` | Edit dates: two dates, `month`, or `last N` |
+| `p` | Calendar month → billing cycle → last 30 days → since August 1 |
+| `b` | Toggle configured subscription-plan comparison |
+| `o`, then `1`–`4` | Export JSON / CSV / SVG / PNG |
+| `r` | Refresh usage and exchange rate |
+| `h` | Explain unavailable hourly / 5-hour data |
+| `?`, `esc` | Help; close editor, details, or error |
 | `q` / `ctrl+c` | Quit |
 
-Dates accept valid `YYYYMMDD` or `YYYY-MM-DD` and are inclusive. No range flags means the entire current calendar month. An explicit single bound remains open on the other side. `--last N` includes today / this week / this month, ends today, and cannot combine with explicit date bounds. Weeks start Monday. Switching grouping keeps the selected date range; use `t` → `last N` to resolve another relative range with the new grouping.
+Settings are per run. To keep a default display currency, add `export TOKENLENS_CURRENCY=EUR` to your shell configuration. `--currency` overrides it.
 
-Use a terminal of at least **50 × 16**; **100 × 32** or larger gives the clearest presentation. The UI adapts its tabs, chart widths, and visible row count. Agent colors use a stable palette hash. Exact counts, USD values to four decimals, and percentages accompany the bars. Percentages use the visible ranking total; partial totals suppress misleading percentages.
+## Dates and billing
 
-## Backend and honesty
+Dates accept valid **YYYYMMDD** or **YYYY-MM-DD**, inclusive. With no range flags, the range is the current calendar month. A single explicit bound remains open on the other side. `--last N` includes the current day/week/month, ends today, and cannot combine with date bounds. Weeks begin Monday.
 
-Tokenlens executes one structured command per load:
+Grouping changes preserve the range. The timezone defaults to UTC, or `TZ` when set; `--timezone` controls both backend filtering and calendar resolution. IANA timezone data is embedded.
+
+The billing preset uses `--billing-day` (default 1), clamped for shorter months, through today. “Since August 1” uses the most recent August 1. `--plan-cost` is your manually configured monthly plan amount in the startup currency; use `--plan-agent` to scope it to the covered agent. Press `b` to compare selected-range API-equivalent usage with that amount. This is **not money saved, subscription credit, an invoice, or proof that every recorded call was included in the plan**. Choose a matching billing range and filter for a meaningful comparison. Changing currency temporarily disables comparison until the configured plan currency is selected again.
+
+## Currency
+
+Non-USD displays fetch the latest published **ECB reference rate via [Frankfurter](https://frankfurter.dev/)** asynchronously. The rate, date, and source stay visible. Only the currency pair is sent; usage data remains local.
+
+These are daily reference rates, **not real-time market quotes**. A single latest rate converts all displayed costs, including historical reports. It is not a historical transaction conversion or a bank's exchange rate. Weekends/holidays can produce an earlier source date. Unsupported currencies or a failed first request leave amounts explicitly labeled USD. A failed later refresh keeps the previous rate with its date and a warning. Demo mode uses a clearly labeled synthetic rate of 0.9 for non-USD currencies and makes no rate request.
+
+All internal costs remain USD. Currency switching changes presentation, not token counts or percentages.
+
+## Startup and caching
+
+There are two independent caches:
+
+1. **Bun's package cache** stores ccusage after its first download.
+2. **Tokenlens snapshots** store the last report for each range, timezone, backend, and pricing mode in the OS user cache directory under `tokenlens`.
+
+A matching snapshot appears immediately while a fresh report loads asynchronously. Its cached status and timestamp are visible. Snapshots older than seven days are not used. Files are private (0600 on Unix), written atomically, and contain usage details; don't publish your cache directory. Use `--no-cache` to disable snapshot reads/writes or `--cache-dir` to select a directory. Demo mode never persists snapshots. Cached files are not automatically deleted when they expire; you can remove Tokenlens's cache directory to clear them.
+
+Normal ccusage pricing refreshes can still take tens of seconds even with the package installed. **`--offline`** uses ccusage's cached-pricing mode and can be much faster:
+
+```sh
+go run . --currency EUR --offline
+```
+
+It is explicitly labeled because estimates **may differ materially** from online pricing; Tokenlens never enables it silently. This flag affects ccusage, not the separate exchange-rate request. Snapshot and exchange-rate refreshes run independently. Superseded loads are canceled, backend loads time out after two minutes, and macOS/Linux cancellation also terminates Bun's installer children.
+
+## Data limits
+
+The adapter uses released unified JSON: `period`, `agents`, and `modelBreakdowns`. It calls:
 
 ```sh
 ccusage daily --sections daily,weekly,monthly,session --by-agent --json \
   --timezone UTC --since 2026-09-01 --until 2026-09-30
 ```
 
-Daily, weekly, monthly, and session reports stay in memory, so views and filters change without another subprocess. Range changes reload; refresh is explicit. Loads run asynchronously, cancel superseded requests, and time out after two minutes. Failed refreshes preserve the previous snapshot and its range. The header shows snapshot time. No log parsers, telemetry, background synchronization, or runtime package installation are included.
+- Token counts alone do not establish **cache money saved**. The necessary uncached per-model prices are not in this report, so savings remain unavailable.
+- Unified sessions tested in 20.0.20 did **not** include repository attribution or timestamped cost events. Tokenlens does not treat a session start time as the timestamp of all its spending, or infer a repository from a session ID.
+- **Hourly and five-hour blocks are different groupings**, and neither can be reconstructed accurately from daily totals. Daily/weekly/monthly are available; the UI explains the unsupported granularities.
+- Source-level reported zero remains zero. Tokenlens cannot tell when an upstream source substitutes zero for missing data.
+- Model token totals are derived only when all four normalized input/output/cache categories exist. Session attribution follows ccusage's semantics.
 
-Costs are **estimates in USD**, provided by ccusage. They are not subscription balance, money remaining, or revenue. Backend pricing/cache/network behavior follows your ccusage configuration. This is a local viewer, not an offline guarantee for ccusage itself.
+There is no local log parser, telemetry, background synchronization, or Tokenlens npm launcher. The optional automatic backend invocation through Bun is separate from packaging Tokenlens itself.
 
-Missing JSON metrics display **unavailable**; incomplete aggregates display **`+ ?`**. Reported zero stays zero: Tokenlens cannot infer whether an upstream source used zero as an unavailable placeholder. Model token totals are derived only when all four token categories exist, using ccusage's normalized input/output/cache schema. Category-level dollar estimates are unavailable, so Tokens / cache always shows token counts. Session range attribution follows ccusage's session report semantics. Missing model/agent breakdowns cannot be reconstructed; unavailable breakdowns may produce an empty filtered view. Upstream schema changes produce a helpful error instead of silently treating an older single-source report as complete.
+## Exports
 
-Demo data is synthetic and deterministic for a given range, bounded to 3,660 days to avoid huge fixtures. It is labeled **DEMO · SYNTHETIC** throughout. Screenshots use demo data only.
+Press `o`, then choose JSON, CSV, SVG, or PNG. Files go into `./exports` (or `--export-dir`) and are never overwritten. JSON/CSV contain all filtered rows, underlying USD estimates, display currency/rate metadata, and the selected range. SVG/PNG are standalone ranked charts of up to 30 rows. Image charts are not full-terminal screenshots. CSV labels are escaped to remain text in spreadsheets. Exported usage can contain private names; the default export directory is gitignored.
 
 ## Development
 
@@ -79,9 +145,20 @@ go vet ./...
 go build -o bin/tokenlens .
 ```
 
-Tests cover invalid/leap dates, month defaults, open bounds, Monday weeks, timezone/DST boundaries, backend command construction, dynamic sources/models, intersections, missing metrics, aggregation, stale load protection, navigation, and terminal dimensions. Optional real-backend integration: save a multi-section JSON report outside the repository and run `TOKENLENS_TEST_SNAPSHOT=/path/to/report.json go test -run TestRealSnapshotOptIn -v`. Never commit personal usage logs.
+Tests cover dates/DST, billing boundaries, dynamic filters, missing metrics, cache identity/privacy/expiry, backend selection, exchange-rate errors, ANSI layouts/themes, period inspection, and all export formats. Optional integration checks: `TOKENLENS_TEST_LIVE_FX=1 go test -run TestLiveExchangeOptIn -v` and `TOKENLENS_TEST_SNAPSHOT=/path/to/report.json go test -run TestRealSnapshotOptIn -v`. Keep private report files outside the repository.
 
-Implementation is intentionally small: `dates.go` resolves calendar bounds, `data.go` adapts ccusage JSON, `ui.go` handles the Charm UI, and `demo.go` generates review data. See [ccusage CLI options](https://ccusage.com/guide/cli-options) and [JSON schema examples](https://ccusage.com/guide/json-output).
+See [ccusage options](https://ccusage.com/guide/cli-options), [JSON examples](https://ccusage.com/guide/json-output), and [Bun executable caching](https://bun.sh/docs/pm/bunx).
+
+## Recording the demo
+
+The README walkthrough is recorded with [Charm VHS](https://github.com/charmbracelet/vhs). The reproducible tape is stored at `docs/demo.tape`. Install VHS and its recording dependencies (`ffmpeg` and `ttyd`), then run from the repository root:
+
+```sh
+go build -o bin/tokenlens .
+vhs docs/demo.tape
+```
+
+This generates `docs/demo.gif` for the animated README preview and `docs/demo.mp4` for video playback. The tape uses fixed dates, synthetic usage, and synthetic exchange rates; it does not read personal logs or contact ccusage. It demonstrates period inspection, model/token comparisons, agent filtering, cache usage, grouping, currency/theme switching, and export controls.
 
 ## License
 

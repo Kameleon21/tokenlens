@@ -143,12 +143,17 @@ func backendArgs(r Range, tz string) []string {
 	}
 	return a
 }
-func load(ctx context.Context, bin string, r Range, tz string) (Snapshot, error) {
-	path, e := exec.LookPath(bin)
+func load(ctx context.Context, bin string, r Range, tz string, offline ...bool) (Snapshot, error) {
+	path, prefix, e := backendCommand(bin)
 	if e != nil {
-		return Snapshot{}, fmt.Errorf("ccusage is not installed or not on PATH. Install ccusage 20.0.20+ (see README), use --ccusage /path/to/ccusage, or try tokenlens --demo")
+		return Snapshot{}, e
 	}
-	cmd := exec.CommandContext(ctx, path, backendArgs(r, tz)...)
+	args := backendArgs(r, tz)
+	if len(offline) > 0 && offline[0] {
+		args = append(args, "--offline")
+	}
+	cmd := exec.CommandContext(ctx, path, append(prefix, args...)...)
+	configureBackend(cmd)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	b, e := cmd.Output()
@@ -274,4 +279,16 @@ func names(s Snapshot, kind string) []string {
 	}
 	sort.Strings(out[1:])
 	return out
+}
+
+func backendCommand(bin string) (string, []string, error) {
+	if path, err := exec.LookPath(bin); err == nil {
+		return path, nil, nil
+	}
+	if bin == "ccusage" {
+		if path, err := exec.LookPath("bunx"); err == nil {
+			return path, []string{"--bun", "ccusage@20.0.20"}, nil
+		}
+	}
+	return "", nil, fmt.Errorf("ccusage is not installed or not on PATH, and bunx is unavailable. Install Bun to let Tokenlens run ccusage automatically, install ccusage 20.0.20, use --ccusage /path/to/ccusage, or try --demo")
 }

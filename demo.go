@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 )
@@ -35,7 +36,7 @@ func demo(r Range, loc *time.Location) Snapshot {
 			row.Agents = append(row.Agents, ar)
 			row.Models = append(row.Models, m)
 			row.Usage.add(u)
-			s.Sections["session"] = append(s.Sections["session"], Row{Name: fmt.Sprintf("%s / studio-%02d", a, n+1), Agent: a, Usage: u, Models: []Row{m}})
+			s.Sections["session"] = append(s.Sections["session"], Row{Name: fmt.Sprintf("%s / studio-%02d", a, n+1), Agent: a, Usage: u, Models: []Row{m}, Metadata: map[string]json.RawMessage{"projectPath": json.RawMessage(fmt.Sprintf("%q", []string{"demo/tokenlens", "demo/website", "demo/api"}[n%3]))}})
 		}
 		s.Sections["daily"] = append(s.Sections["daily"], row)
 		for _, group := range []string{"weekly", "monthly"} {
