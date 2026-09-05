@@ -12,6 +12,7 @@ import (
 )
 
 type Options struct {
+	CacheTTL                                  time.Duration
 	Offline                                   bool
 	CacheDir                                  string
 	NoCache                                   bool
@@ -46,7 +47,8 @@ func options(args []string, now time.Time) (Options, error) {
 	f.StringVar(&o.Bin, "ccusage", "ccusage", "ccusage executable path")
 	f.StringVar(&o.CacheDir, "cache-dir", "", "snapshot cache directory (default OS user cache / tokenlens)")
 	f.BoolVar(&o.Offline, "offline", false, "use ccusage cached pricing for speed (estimates may differ)")
-	f.BoolVar(&o.NoCache, "no-cache", false, "disable on-disk usage snapshots")
+	f.DurationVar(&o.CacheTTL, "cache-ttl", 5*time.Minute, "reuse recent reports for this long; 0 always reloads; r forces refresh")
+	f.BoolVar(&o.NoCache, "no-cache", false, "disable memory and on-disk usage snapshots")
 	f.StringVar(&o.Theme, "theme", "dark", "dark, light, or ascii")
 	f.StringVar(&o.ExportDir, "export-dir", "exports", "directory for filtered CSV/JSON/SVG/PNG exports")
 	f.Float64Var(&o.PlanCost, "plan-cost", 0, "configured monthly plan price in startup display currency")
@@ -72,6 +74,9 @@ func options(args []string, now time.Time) (Options, error) {
 	})
 	if hasLast && last == 0 {
 		return o, fmt.Errorf("--last must be between 1 and 10000")
+	}
+	if o.CacheTTL < 0 {
+		return o, fmt.Errorf("--cache-ttl must not be negative")
 	}
 	if o.Theme != "dark" && o.Theme != "light" && o.Theme != "ascii" {
 		return o, fmt.Errorf("--theme must be dark, light, or ascii")

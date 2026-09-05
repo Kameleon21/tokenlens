@@ -85,3 +85,35 @@ func writeSnapshotCache(o Options, r Range, s Snapshot) error {
 	}
 	return os.Rename(f.Name(), path)
 }
+
+// reusedMsg completes a request without invoking the backend.
+type reusedMsg struct {
+	s  Snapshot
+	r  Range
+	id int
+}
+
+func snapshotFresh(s Snapshot, ttl time.Duration, now time.Time) bool {
+	age := now.Sub(s.Loaded)
+	return ttl > 0 && !s.Loaded.IsZero() && age >= 0 && age < ttl
+}
+
+func (m *model) remember(r Range, s Snapshot) {
+	if m.o.NoCache || m.o.Demo {
+		return
+	}
+	if m.reports == nil {
+		m.reports = make(map[Range]Snapshot)
+	}
+	if _, exists := m.reports[r]; !exists && len(m.reports) >= 16 {
+		var oldest Range
+		var loaded time.Time
+		for key, report := range m.reports {
+			if loaded.IsZero() || report.Loaded.Before(loaded) {
+				oldest, loaded = key, report.Loaded
+			}
+		}
+		delete(m.reports, oldest)
+	}
+	m.reports[r] = s
+}

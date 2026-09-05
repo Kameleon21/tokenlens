@@ -35,6 +35,8 @@ type exchangeMsg struct {
 	id       int
 }
 type model struct {
+	reports                               map[Range]Snapshot
+	fxRequest                             int
 	compactNumbers                        bool
 	info                                  string
 	cached                                bool
@@ -75,7 +77,12 @@ func newModel(ctx context.Context, o Options) model {
 	return model{ctx: ctx, o: o, width: 100, height: 32, cost: true, spin: sp, input: ti, fx: usdExchange()}
 }
 func (m model) Init() tea.Cmd { return func() tea.Msg { return "initial-load" } }
-func (m *model) refresh(r Range) tea.Cmd {
+func (m *model) refresh(r Range, force ...bool) tea.Cmd {
+	// Repeated refresh presses must not restart an already running report.
+	if m.loading && m.pending == r {
+		return nil
+	}
+	forced := len(force) > 0 && force[0]
 	if m.cancel != nil {
 		m.cancel()
 	}
@@ -89,14 +96,7 @@ func (m *model) refresh(r Range) tea.Cmd {
 	o := m.o
 	m.pending = r
 	fxCmd := m.refreshExchange()
-	cacheCmd := func() tea.Msg {
-		s, e := readSnapshotCache(o, r)
-		if e != nil {
-			return nil
-		}
-		return cachedMsg{s, r, id}
-	}
-	return tea.Batch(m.spin.Tick, fxCmd, cacheCmd, func() tea.Msg {
+	backendCmd := func() tea.Msg {
 		defer cancel()
 		var s Snapshot
 		var e error
@@ -110,7 +110,23 @@ func (m *model) refresh(r Range) tea.Cmd {
 			_ = writeSnapshotCache(o, r, s)
 		}
 		return loadedMsg{s, e, id, r}
-	})
+	}
+	// Copy the candidate before running commands; only Update owns the map.
+	candidate, found := m.reports[r]
+	reportCmd := func() tea.Msg {
+		if !found || o.NoCache {
+			candidate, _ = readSnapshotCache(o, r)
+		}
+		if !o.NoCache && !o.Demo && !candidate.Loaded.IsZero() && time.Since(candidate.Loaded) <= 7*24*time.Hour {
+			if !forced && snapshotFresh(candidate, o.CacheTTL, time.Now()) {
+				cancel()
+				return reusedMsg{candidate, r, id}
+			}
+			return tea.Sequence(func() tea.Msg { return cachedMsg{candidate, r, id} }, backendCmd)()
+		}
+		return backendCmd()
+	}
+	return tea.Batch(m.spin.Tick, fxCmd, reportCmd)
 }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch v := msg.(type) {
@@ -136,6 +152,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cached = true
 		}
 		return m, nil
+	case reusedMsg:
+		if v.id != m.request {
+			return m, nil
+		}
+		m.loading = false
+		m.cached = true
+		m.s, m.o.Range = v.s, v.r
+		m.cursor, m.details = 0, false
+		m.remember(v.r, v.s)
+		return m, nil
 	case exportedMsg:
 		if v.err != nil {
 			m.notice = "Export failed: " + v.err.Error()
@@ -144,7 +170,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case exchangeMsg:
-		if v.id != m.request {
+		if v.id != m.fxRequest {
 			return m, nil
 		}
 		m.fxLoading = false
@@ -163,6 +189,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.err = v.err.Error()
 		} else {
 			m.s = v.s
+			m.remember(v.r, v.s)
 			m.cached = false
 			m.o.Range = v.r
 			m.cursor = 0
@@ -304,7 +331,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.compactNumbers = !m.compactNumbers
 		case "e":
 			m.o.Currency = cycle([]string{"USD", "EUR", "GBP", "JPY"}, m.o.Currency)
-			return m, m.refresh(m.o.Range)
+			return m, m.refreshExchange()
 		case "T":
 			m.o.Theme = cycle([]string{"dark", "light", "ascii"}, m.o.Theme)
 			applyTheme(m.o.Theme)
@@ -370,7 +397,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.modelFilter = ""
 			m.cursor = 0
 		case "r":
-			return m, m.refresh(m.o.Range)
+			r := m.o.Range
+			if m.loading {
+				r = m.pending
+			}
+			return m, m.refresh(r, true)
 		case "t":
 			m.editing = "range"
 			m.input.SetValue(m.o.Range.Since + " " + m.o.Range.Until)
@@ -673,6 +704,7 @@ func (m model) compactView() string {
 }
 
 func (m *model) refreshExchange() tea.Cmd {
+	m.fxRequest++
 	if m.fxCancel != nil {
 		m.fxCancel()
 	}
@@ -686,7 +718,7 @@ func (m *model) refreshExchange() tea.Cmd {
 	m.fxErr = ""
 	ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
 	m.fxCancel = cancel
-	currency, id, demoMode := m.o.Currency, m.request, m.o.Demo
+	currency, id, demoMode := m.o.Currency, m.fxRequest, m.o.Demo
 	return func() tea.Msg {
 		defer cancel()
 		if demoMode {
