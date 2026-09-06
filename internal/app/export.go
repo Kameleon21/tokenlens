@@ -143,7 +143,7 @@ func (m model) chartExportRows(rows []Row) ([]Row, float64) {
 	return rows, peak
 }
 func (m model) exportSubtitle() string {
-	return m.o.Range.String() + " · " + m.o.TZ + " · " + m.fx.Currency + " · agent: " + emptyAll(m.agent) + " · model: " + emptyAll(m.modelFilter)
+	return m.formatRange(m.o.Range) + " · " + m.o.TZ + " · " + m.fx.Currency + " · agent: " + emptyAll(m.agent) + " · model: " + emptyAll(m.modelFilter)
 }
 func emptyAll(s string) string {
 	if s == "" {
@@ -163,9 +163,9 @@ func (m model) exportSVG(rows []Row) string {
 		if peak > 0 {
 			width = v.Value / peak * 490
 		}
-		fmt.Fprintf(&b, `<text x="30" y="%d" font-size="12">%s</text><rect x="360" y="%d" width="%.2f" height="15" rx="3" fill="%s"/><text x="870" y="%d" font-size="12">%s</text>`, y, html.EscapeString(clip(safe(r.Name), 42)), y-12, width, string(colorFor(r.Name, m.o.Theme)), y, html.EscapeString(m.formatMetric(v, m.cost && m.view != 3)))
+		fmt.Fprintf(&b, `<text x="30" y="%d" font-size="12">%s</text><rect x="360" y="%d" width="%.2f" height="15" rx="3" fill="%s"/><text x="870" y="%d" font-size="12">%s</text>`, y, html.EscapeString(clip(safe(m.rowLabel(r)), 42)), y-12, width, string(colorFor(r.Name, m.o.Theme)), y, html.EscapeString(m.formatMetric(v, m.cost && m.view != 3)))
 	}
-	note := m.fx.label()
+	note := m.exchangeLabel()
 	if m.o.Demo {
 		note += " · SYNTHETIC DEMO"
 	}
@@ -192,11 +192,11 @@ func (m model) exportPNG(rows []Row) ([]byte, error) {
 		if peak > 0 {
 			width = int(v.Value / peak * 490)
 		}
-		label(30, y, clip(safe(r.Name), 42))
+		label(30, y, clip(safe(m.rowLabel(r)), 42))
 		draw.Draw(img, image.Rect(360, y-12, 360+width, y+3), &image.Uniform{imgcolor.RGBA{128, 216, 195, 255}}, image.Point{}, draw.Src)
 		label(870, y, m.formatMetric(v, m.cost && m.view != 3))
 	}
-	note := m.fx.label()
+	note := m.exchangeLabel()
 	if m.o.Demo {
 		note += " | SYNTHETIC DEMO"
 	}

@@ -117,7 +117,7 @@ func TestExchangeFallbackAndStaleResult(t *testing.T) {
 	}
 	v, _ = m.Update(exchangeMsg{exchange: Exchange{Currency: "EUR", Rate: 0.86, Date: "2026-09-04", Source: "ECB via Frankfurter"}, id: 2})
 	m = v.(model)
-	if !strings.Contains(m.exchangeStatus(), "2026-09-04") {
+	if !strings.Contains(m.exchangeStatus(), "4 Sep 2026") {
 		t.Fatal("missing date")
 	}
 	v, _ = m.Update(exchangeMsg{err: errors.New("offline"), id: 2})
@@ -156,7 +156,7 @@ func TestEuroViewsAndLayout(t *testing.T) {
 	m.details = false
 	m.view = 0
 	s := ansi.Strip(m.View())
-	if !strings.Contains(s, "ESTIMATED COST · EUR") || !strings.Contains(s, "€") || !strings.Contains(s, "2026-09-04") {
+	if !strings.Contains(s, "ESTIMATED COST · EUR") || !strings.Contains(s, "€") || !strings.Contains(s, "4 Sep 2026") {
 		t.Fatal("missing euro attribution")
 	}
 }

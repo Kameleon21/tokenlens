@@ -5,6 +5,10 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+### Fixed
+
+- Apply the saved date format across all tabs, overview charts, activity details, range editing, exchange-rate labels, and SVG/PNG exports.
+
 ## [0.4.0] - 2026-09-06
 
 ### Added

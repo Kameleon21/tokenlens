@@ -225,6 +225,13 @@ models_sort = "cost_desc" # cost_desc, cost_asc, name_asc, name_desc
 sessions_sort = "cost_desc" # same options plus newest, oldest
 ```
 
+The saved date and clock formats apply across all tabs, Inspector, overview charts,
+range labels and the range editor, exchange-rate dates, and SVG/PNG exports.
+In the range editor, separate formatted dates with `to` or `→` (for example,
+`6 Sep 2026 to 30 Sep 2026`). ISO input remains accepted. Calendar dates keep
+their reported day; timestamps use the selected timezone. JSON/CSV exports
+retain canonical ISO dates and precise UTC timestamps for machine use.
+
 Missing fields use defaults. Grouping accepts `daily`, `weekly`, or `monthly`;
 display accepts `cost` or `tokens`; layout accepts `dashboard` or `stacked`.
 Use the theme identifiers shown by `tokenlens --help`.

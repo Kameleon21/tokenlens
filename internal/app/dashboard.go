@@ -78,7 +78,7 @@ func (m model) dashboardView() string {
 			fresh += " · cached " + m.formatTimestamp(m.s.Loaded)
 		}
 	}
-	head.WriteString(muted.Render(m.o.Range.String()+"  ·  "+m.o.TZ) + strings.Repeat(" ", max(2, w-len(m.o.Range.String()+"  ·  "+m.o.TZ)-ansi.StringWidth(fresh))) + muted.Render(fresh) + "\n")
+	head.WriteString(muted.Render(m.formatRange(m.o.Range)+"  ·  "+m.o.TZ) + strings.Repeat(" ", max(2, w-len(m.formatRange(m.o.Range)+"  ·  "+m.o.TZ)-ansi.StringWidth(fresh))) + muted.Render(fresh) + "\n")
 	head.WriteString(muted.Render(strings.Repeat("─", w)) + "\n")
 	filters := chip("All agents", m.agent == "", lipgloss.Color(paletteFor(activeTheme).accent))
 	agentNames := names(m.s, "agent")
@@ -145,7 +145,7 @@ func (m model) dashboardView() string {
 	case m.help:
 		body = pane("CONTROLS", "esc close", m.helpText(), w, bodyH, true)
 	case m.editing != "":
-		body = pane("DATE RANGE", "enter apply · esc cancel", m.input.View()+"\n\n"+muted.Render("Two inclusive dates: 2026-09-01 2026-09-30\nUse * for an open bound, month, or last N.\nN uses the current daily / weekly / monthly grouping.")+"\n\n"+safe(m.err), w, bodyH, true)
+		body = pane("DATE RANGE", "enter apply · esc cancel", m.input.View()+"\n\n"+muted.Render(m.rangeHelp())+"\n\n"+safe(m.err), w, bodyH, true)
 	case m.err != "":
 		msg := safe(m.err)
 		if strings.Contains(m.err, "not installed") {
@@ -229,6 +229,9 @@ func (m model) bars(rows []Row, w, h int, selected bool) string {
 		v := m.value(r)
 		val := m.formatMetric(v, m.cost && m.view != 3) + "  " + shareOf(v, sum)
 		label := safe(r.Name)
+		if selected && m.view == 0 {
+			label = safe(m.formatPeriod(r.Name))
+		}
 		prefix := ""
 		if selected {
 			prefix = "  "
@@ -423,7 +426,7 @@ func (m model) activityChart(w, h int) string {
 		line += "  " + m.formatMetric(sum, m.cost)
 		lines = append(lines, clip(line, w))
 	}
-	lines = append(lines, "", muted.Render(clip(daily[0].Name+" → "+daily[len(daily)-1].Name+" · active days · low ░▒▓█ high", w)))
+	lines = append(lines, "", muted.Render(clip(m.formatPeriod(daily[0].Name)+" → "+m.formatPeriod(daily[len(daily)-1].Name)+" · active days · low ░▒▓█ high", w)))
 	return strings.Join(lines, "\n")
 }
 func (m model) drilldown(w, h int) string {
@@ -437,7 +440,7 @@ func (m model) drilldown(w, h int) string {
 	details := muted.Render("Select a row to inspect its metrics.")
 	if len(rows) > 0 {
 		r := rows[min(m.cursor, len(rows)-1)]
-		details = bright.Render(safe(r.Name)) + "\n" + m.sessionTimes(r) + "\n" + muted.Render("ESTIMATED COST · "+m.fx.Currency) + "\n" + accent.Bold(true).Render(m.fx.format(r.Usage.Cost)) + "\n\n" + muted.Render("TOKEN BREAKDOWN") + "\n"
+		details = bright.Render(safe(m.rowLabel(r))) + "\n" + m.sessionTimes(r) + "\n" + muted.Render("ESTIMATED COST · "+m.fx.Currency) + "\n" + accent.Bold(true).Render(m.fx.format(r.Usage.Cost)) + "\n\n" + muted.Render("TOKEN BREAKDOWN") + "\n"
 		for _, v := range []struct {
 			name string
 			v    Metric

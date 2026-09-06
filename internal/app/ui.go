@@ -312,6 +312,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if key == "enter" {
 				parts := strings.Fields(m.input.Value())
+				if pair := strings.Split(strings.ReplaceAll(m.input.Value(), " to ", "→"), "→"); len(pair) == 2 {
+					parts = []string{strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1])}
+				}
 				loc, _ := time.LoadLocation(m.o.TZ)
 				var r datefilter.Range
 				var e error
@@ -325,7 +328,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						r, e = datefilter.Resolve("", "", n, m.o.Group, time.Now(), loc)
 					}
 				} else if len(parts) == 2 {
-					s, u := parts[0], parts[1]
+					s, u := m.canonicalDate(parts[0]), m.canonicalDate(parts[1])
 					if s == "*" {
 						s = ""
 					}
@@ -538,7 +541,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.refresh(r, true)
 		case "t":
 			m.editing = "range"
-			m.input.SetValue(m.o.Range.Since + " " + m.o.Range.Until)
+			m.input.SetValue(m.rangeInput())
 			m.input.Focus()
 			return m, textinput.Blink
 		}
@@ -653,7 +656,7 @@ func (m model) compactView() string {
 		badge = "DEMO · SYNTHETIC"
 	}
 	b.WriteString(bright.Render("◈  TOKENLENS") + "  " + muted.Render("/  usage, in focus") + "   " + accent.Render(badge) + "\n")
-	b.WriteString(muted.Render(clip(m.o.Range.String()+"  ·  "+m.o.TZ, w)) + "\n" + m.themeIndicator() + "\n")
+	b.WriteString(muted.Render(clip(m.formatRange(m.o.Range)+"  ·  "+m.o.TZ, w)) + "\n" + m.themeIndicator() + "\n")
 	u := total(filtered(m.s.Sections["daily"], m.agent, m.modelFilter))
 	summary := "Tokens  " + bright.Render(format(u.Tokens, false)) + "    Estimated cost (" + m.fx.Currency + ")  " + accent.Render(m.fx.format(u.Cost))
 	if m.s.Loaded.IsZero() {
@@ -675,7 +678,7 @@ func (m model) compactView() string {
 		}
 	}
 	if m.loading {
-		fresh = m.spin.View() + " loading " + m.pending.String() + " · " + fresh
+		fresh = m.spin.View() + " loading " + m.formatRange(m.pending) + " · " + fresh
 	}
 	b.WriteString(muted.Render(clip(fresh, w)) + "\n")
 	if m.o.Currency != "USD" {
@@ -720,7 +723,7 @@ func (m model) compactView() string {
 	} else if m.help {
 		b.WriteString(m.helpText())
 	} else if m.editing != "" {
-		b.WriteString(bright.Render("Change date range") + "\n\n" + m.input.View() + "\n\n" + muted.Render("YYYY-MM-DD YYYY-MM-DD · * for open bound\nmonth · last N (uses current grouping)\nenter apply · esc cancel"))
+		b.WriteString(bright.Render("Change date range") + "\n\n" + m.input.View() + "\n\n" + muted.Render(m.rangeHelp()+"\nenter apply · esc cancel"))
 		if m.err != "" {
 			b.WriteString("\n\n" + safe(m.err))
 		}
@@ -730,7 +733,7 @@ func (m model) compactView() string {
 		rows := m.rows()
 		if len(rows) > 0 {
 			r := rows[min(m.cursor, len(rows)-1)]
-			b.WriteString(bright.Render(clip(safe(r.Name), w)) + "\n" + m.sessionTimes(r) + "\n")
+			b.WriteString(bright.Render(clip(safe(m.rowLabel(r)), w)) + "\n" + m.sessionTimes(r) + "\n")
 			for _, v := range []struct {
 				label string
 				v     Metric
@@ -815,7 +818,7 @@ func (m model) compactView() string {
 				if i == m.cursor {
 					pointer = accent.Render("› ")
 				}
-				name := clip(safe(r.Name), labelWidth)
+				name := clip(safe(m.rowLabel(r)), labelWidth)
 				name += strings.Repeat(" ", max(0, labelWidth-ansi.StringWidth(name)))
 				c := color(r.Agent)
 				if r.Agent == "" {
@@ -908,7 +911,7 @@ func (m model) exchangeStatus() string {
 		}
 		return "FX  unavailable for " + m.o.Currency + " · showing USD · r retry"
 	}
-	s := m.fx.label()
+	s := m.exchangeLabel()
 	if m.fxErr != "" {
 		s += " · refresh failed; previous rate"
 	} else if m.fxLoading {

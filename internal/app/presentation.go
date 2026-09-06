@@ -5,6 +5,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/Kameleon21/tokenlens/internal/datefilter"
 )
 
 var modelSorts = []string{"cost_desc", "cost_asc", "name_asc", "name_desc"}
@@ -55,15 +57,72 @@ func (m model) formatTimestamp(t time.Time) string {
 	if m.o.preferences.ClockFormat == "12h" {
 		clock = "3:04 PM"
 	}
-	date := "2 Jan 2006"
+	return t.Format(clock) + " · " + t.Format(m.dateLayout())
+}
+func (m model) dateLayout() string {
 	switch m.o.preferences.DateFormat {
 	case "us":
-		date = "Jan 2, 2006"
+		return "Jan 2, 2006"
 	case "iso":
-		date = "2006-01-02"
+		return "2006-01-02"
+	default:
+		return "2 Jan 2006"
 	}
-	return t.Format(clock) + " · " + t.Format(date)
 }
+
+// Calendar periods have no timezone: converting midnight would shift their day.
+func (m model) formatPeriod(value string) string {
+	if t, err := time.Parse("2006-01-02", value); err == nil {
+		return t.Format(m.dateLayout())
+	}
+	if t, err := time.Parse("2006-01", value); err == nil && m.o.preferences.DateFormat != "iso" {
+		return t.Format("Jan 2006")
+	}
+	return value
+}
+func (m model) formatRange(r datefilter.Range) string {
+	since, until := "beginning", "latest"
+	if r.Since != "" {
+		since = m.formatPeriod(r.Since)
+	}
+	if r.Until != "" {
+		until = m.formatPeriod(r.Until)
+	}
+	return since + " → " + until
+}
+func (m model) rowLabel(r Row) string {
+	if m.view == 0 {
+		return m.formatPeriod(r.Name)
+	}
+	return r.Name
+}
+func (m model) exchangeLabel() string {
+	x := m.fx
+	x.Date = m.formatPeriod(x.Date)
+	return x.label()
+}
+func (m model) rangeInput() string {
+	since, until := "*", "*"
+	if m.o.Range.Since != "" {
+		since = m.formatPeriod(m.o.Range.Since)
+	}
+	if m.o.Range.Until != "" {
+		until = m.formatPeriod(m.o.Range.Until)
+	}
+	return since + " → " + until
+}
+func (m model) canonicalDate(value string) string {
+	value = strings.TrimSpace(value)
+	if t, err := time.Parse(m.dateLayout(), value); err == nil {
+		return t.Format("2006-01-02")
+	}
+	return value
+}
+func (m model) rangeHelp() string {
+	return "Two inclusive dates: " + m.formatPeriod("2026-09-01") + " → " + m.formatPeriod("2026-09-30") +
+		"\nSeparate dates with → or to; * for an open bound.\nISO dates, month, or last N also accepted.\nN uses the current daily / weekly / monthly grouping."
+}
+
 func (m model) metadataValue(r Row, key string) string {
 	if t, ok := r.metadataTimes[key]; ok {
 		return m.formatTimestamp(t)
