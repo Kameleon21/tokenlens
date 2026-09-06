@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/muesli/termenv"
 )
 
@@ -64,6 +65,26 @@ func TestThemeStartupAndBackground(t *testing.T) {
 		prefix := strings.SplitN(expected, "x", 2)[0]
 		if prefix == "" || !strings.HasPrefix(themeRender("hello", name, 50, 16), prefix) {
 			t.Fatalf("wrong background for %s", name)
+		}
+	}
+}
+
+func TestThemeIndicatorVisibleAtTop(t *testing.T) {
+	defer applyTheme("dark")
+	m := fixtureModel()
+	for _, name := range themeNames {
+		m.o.Theme = name
+		applyTheme(name)
+		for _, wh := range [][2]int{{50, 16}, {80, 24}, {96, 32}, {160, 50}} {
+			m.width, m.height = wh[0], wh[1]
+			for view := 0; view < 5; view++ {
+				m.view = view
+				lines := strings.Split(ansi.Strip(m.View()), "\n")
+				top := strings.Join(lines[:min(4, len(lines))], "\n")
+				if !strings.Contains(top, "Theme: "+themeLabel(name)) || !strings.Contains(top, "Shift+T next") {
+					t.Fatalf("missing visible theme indicator for %s at %v view %d: %s", name, wh, view, top)
+				}
+			}
 		}
 	}
 }

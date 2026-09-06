@@ -26,7 +26,7 @@ All available agent and model names are discovered dynamically. Agent and model 
 | `n` | Toggle compact k/M/B token labels (inspector remains exact) |
 | `c` / `s` | Cost vs. tokens; descending / ascending / name sorting |
 | `e` | Cycle USD, EUR, GBP, JPY |
-| `T` | Cycle theme (active name appears in footer) |
+| `T` | Cycle theme (active name appears at the top) |
 | `t` | Edit dates: two dates, `month`, or `last N` |
 | `p` | Calendar month → billing cycle → last 30 days → since August 1 |
 | `b` | Toggle configured subscription-plan comparison |
@@ -97,6 +97,9 @@ Press `o`, then choose JSON, CSV, SVG, or PNG. Files go into `./exports` (or `--
 Press `Shift+T` inside the dashboard to cycle through Dark, Light, ASCII, Nord,
 Gruvbox, Tokyo Night Light, Dracula, Catppuccin Mocha, and Solarized Light.
 The palette changes immediately, including charts, highlights, and backgrounds.
+A prominent `Theme: Nord [4/9]` indicator at the top always shows the current
+theme, its position in the cycle, and the `Shift+T next` shortcut, including in
+compact terminals.
 The selection lasts for the current run. Choose a startup theme with `--theme`:
 
 ```sh
