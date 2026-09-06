@@ -265,7 +265,11 @@ func TestSortControlsAndTimestampLayouts(t *testing.T) {
 			t.Fatalf("overflow at %v", size)
 		}
 		m.help = true
-		help := ansi.Strip(m.View())
+		help := ""
+		for offset := range strings.Split(m.helpText(), "\n") {
+			m.helpOffset = offset
+			help += ansi.Strip(m.View()) + "\n"
+		}
 		for _, word := range []string{"Sessions also", "D  Date:", "H  Clock:"} {
 			if !strings.Contains(help, word) {
 				t.Fatalf("missing %s at %v:\n%s", word, size, help)
@@ -320,7 +324,7 @@ func TestHelpScrollsAndKeepsTabSelection(t *testing.T) {
 	if cmd != nil || m.helpOffset == 0 || m.cursor != 3 || m.view != 4 {
 		t.Fatal("help navigation changed tab or requested work")
 	}
-	if !strings.Contains(ansi.Strip(m.View()), "Quit") {
+	if !strings.Contains(ansi.Strip(m.View()), "Cost is estimated") {
 		t.Fatal("last help controls inaccessible")
 	}
 	next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
@@ -401,6 +405,38 @@ func TestLocalizedRangeEditor(t *testing.T) {
 		m = updated.(model)
 		if m.err != "" || m.editing != "" || cmd == nil || m.pending.Since != "2026-09-06" || m.pending.Until != "2026-09-07" {
 			t.Fatalf("%q: error %s, pending %+v", input, m.err, m.pending)
+		}
+	}
+}
+
+func TestHelpRestoresCurrentScreen(t *testing.T) {
+	for _, size := range [][2]int{{50, 16}, {80, 24}, {100, 32}, {150, 45}} {
+		for tab := range views {
+			m := newModel(context.Background(), Options{TZ: "UTC", Group: "daily"})
+			m.width, m.height, m.view, m.cursor = size[0], size[1], tab, 3
+			m.details, m.activityDetail = true, true
+			m.info = "Existing information"
+			before := m.View()
+			next, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
+			m = next.(model)
+			help := ansi.Strip(m.View())
+			if !strings.Contains(help, views[tab]) || strings.Contains(help, m.info) {
+				t.Fatalf("help must replace content and retain tab %s at %v", views[tab], size)
+			}
+			if lipgloss.Width(help) > m.width || lipgloss.Height(help) > m.height {
+				t.Fatalf("help overflows at %v", size)
+			}
+			for _, key := range []tea.KeyMsg{{Type: tea.KeyTab}, {Type: tea.KeyRunes, Runes: []rune{'2'}}} {
+				next, _ = m.Update(key)
+				m = next.(model)
+			}
+			next, _ = m.Update(tea.MouseMsg{X: 10, Y: 20})
+			m = next.(model)
+			next, _ = m.Update(tea.KeyMsg{Type: tea.KeyEsc})
+			m = next.(model)
+			if m.help || m.view != tab || m.cursor != 3 || m.View() != before {
+				t.Fatalf("closing help changed underlying screen at %v, tab %s", size, views[tab])
+			}
 		}
 	}
 }

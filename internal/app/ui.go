@@ -206,7 +206,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.MouseMsg:
-		if m.choosingTheme {
+		if m.choosingTheme || m.help {
 			return m, nil
 		}
 		if m.view == 0 && !m.activityDetail && !m.details && m.width >= 96 && m.height >= 32 && m.layout == 0 && v.Y >= 19 && v.Y < 16+(m.height-20)/2-1 && v.X >= 5 && v.X < (m.width-4)/2 {
@@ -361,6 +361,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		}
 		if key == "esc" {
+			if m.help {
+				m.help = false
+				return m, nil
+			}
 			m.details = false
 			m.info = ""
 			m.activityDetail = false
@@ -388,7 +392,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case "end":
 				m.helpOffset = len(strings.Split(m.helpText(), "\n"))
 			}
-			m.helpOffset = max(0, min(m.helpOffset, max(0, len(strings.Split(m.helpText(), "\n"))-max(1, m.height-6))))
+			m.helpOffset = max(0, min(m.helpOffset, max(0, len(strings.Split(m.helpText(), "\n"))-1)))
 			return m, nil
 		}
 		switch key {
@@ -716,12 +720,13 @@ func (m model) compactView() string {
 	}
 	b.WriteString(muted.Render(clip(filterLabel, w)) + "\n")
 	b.WriteString(muted.Render(strings.Repeat("─", w)) + "\n")
-	if m.info != "" {
+	if m.help {
+		slots := max(1, m.height-4-lipgloss.Height(b.String())+1)
+		b.WriteString(m.helpContent(slots))
+	} else if m.info != "" {
 		b.WriteString("DATA AVAILABILITY\n\n" + m.info + "\n\nesc close")
 	} else if m.exporting {
 		b.WriteString("EXPORT FILTERED VIEW\n\n1 JSON    2 CSV    3 SVG    4 PNG\n\nesc cancel")
-	} else if m.help {
-		b.WriteString(m.helpText())
 	} else if m.editing != "" {
 		b.WriteString(bright.Render("Change date range") + "\n\n" + m.input.View() + "\n\n" + muted.Render(m.rangeHelp()+"\nenter apply · esc cancel"))
 		if m.err != "" {
@@ -837,6 +842,9 @@ func (m model) compactView() string {
 		}
 	}
 	footer := muted.Render("s sort  D date  H clock  ? help  q quit")
+	if m.help {
+		footer = muted.Render("CONTROLS · ↑ ↓ scroll · home/end · esc close")
+	}
 	content := b.String()
 	lines := strings.Split(content, "\n")
 	maxLines := m.height - 4
