@@ -2,6 +2,26 @@
 
 Small fixes can go straight to a pull request. Open an issue before a large feature, new dependency, backend, or package restructuring so we can agree on scope.
 
+## Before you contribute
+
+Read the [code of conduct](CODE_OF_CONDUCT.md). For questions and troubleshooting,
+see [SUPPORT.md](SUPPORT.md); report vulnerabilities privately as described in
+[SECURITY.md](SECURITY.md).
+
+Search existing issues and pull requests first. For code changes, fork the
+repository, create a topic branch from `main`, and open a PR back to `main`.
+Draft PRs are welcome when you want early feedback. An issue or proposal is not
+a commitment that a feature will be implemented or a PR accepted.
+
+## Contribution rights
+
+By submitting a contribution, you agree that it is provided under this project's
+[MIT license](LICENSE). Submit only work you have the right to contribute and
+preserve third-party license notices and attribution. No separate contributor
+license agreement or commit sign-off is required. If you use AI tools, you remain
+responsible for understanding, checking, and having the rights to the submitted
+code; generated changes receive the same review as other contributions.
+
 ## Setup and checks
 
 Install Go 1.25 or newer, Python 3, and Make. Clone the repository and run:
@@ -25,7 +45,12 @@ Run `gofmt` on Go files you change. Normal tests use synthetic fixtures and loca
 
 After a PR is merged, delete its remote branch and remove the local branch once its commits are confirmed on `main`. Keep unmerged branches and any uncommitted work.
 
-Maintainers review and merge changes. Passing CI is required by this contribution policy; repository branch protection is a separate GitHub setting.
+Maintainers review and merge changes. All required CI checks must pass and review
+conversations must be resolved before merging. External fork workflows need a
+maintainer's approval to run; a waiting workflow does not mean your PR is rejected.
+Maintainers may request revisions or decline changes based on scope, complexity,
+compatibility, or ongoing maintenance cost. See [GOVERNANCE.md](GOVERNANCE.md) for
+decisions and [the maintainer guide](docs/maintaining.md) for repository safeguards.
 
 ## Project layout
 

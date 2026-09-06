@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security vulnerability privately
+    url: https://github.com/Kameleon21/tokenlens/security/advisories/new
+    about: Do not disclose vulnerabilities in public issues.
+  - name: Support and troubleshooting
+    url: https://github.com/Kameleon21/tokenlens/blob/main/SUPPORT.md
+    about: Read the guides and support expectations before opening an issue.
