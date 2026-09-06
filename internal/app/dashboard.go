@@ -99,7 +99,7 @@ func (m model) dashboardView() string {
 	u := total(filtered(m.s.Sections["daily"], m.agent, m.modelFilter))
 	gap := 2
 	cardW := (w - 2*gap) / 3
-	costBody := accent.Bold(true).Render(m.fx.format(u.Cost)) + "\n" + bright.Render(format(u.Tokens, false)) + muted.Render(" total tokens") + "\n" + muted.Render("ccusage estimate · not a subscription balance")
+	costBody := accent.Bold(true).Render(m.fx.format(u.Cost)) + "\n" + bright.Render(format(u.Tokens, false)) + muted.Render(" total tokens") + "\n" + muted.Render(clip(m.pricingStatus(), cardW-6))
 
 	if m.showPlan {
 		costBody = m.planSummary()

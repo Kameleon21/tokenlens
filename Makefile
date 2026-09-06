@@ -1,4 +1,4 @@
-.PHONY: check release-check release-snapshot release-prepare release-tag
+.PHONY: check release-check release-snapshot release-prepare release-tag prices-update
 
 check:
 	@test -z "$$(gofmt -l .)"
@@ -23,3 +23,7 @@ release-prepare:
 # Run on clean, synchronized main after its Checks workflow passes.
 release-tag:
 	python3 scripts/release.py tag
+
+# Refresh the committed initial catalog; review and commit its changes.
+prices-update:
+	python3 scripts/sync_prices.py

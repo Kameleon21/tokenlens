@@ -40,5 +40,5 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
-      - name: Check native preference paths and persistence
-        run: go test ./internal/app -run 'Test(ConfigLocations|PreferencePrecedenceAndNoStartupWrites|TUIChoicesPersistAndRestore|ThemePreviewAndCancelNeverSave|InvalidConfigAndResetRecovery|SaveFailureKeepsTUIUsable)$'
+      - name: Check native application behavior
+        run: go test ./internal/app
