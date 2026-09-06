@@ -5,6 +5,8 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+## [0.5.2] - 2026-09-06
+
 ### Fixed
 
 - Keep the configured currency visible at startup by loading the last successful exchange rate immediately. Reuse rates for 24 hours, including on manual refresh; retain dated rates when a refresh fails, and show unavailable costs until a first rate succeeds.
@@ -111,3 +113,5 @@ User-visible changes are recorded here. Versions follow the conventions in
 [0.5.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.5.0
 
 [0.5.1]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.5.1
+
+[0.5.2]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.5.2
