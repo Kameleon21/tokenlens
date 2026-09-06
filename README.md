@@ -5,7 +5,6 @@
 </p>
 
 [![Release](https://img.shields.io/github/v/release/Kameleon21/tokenlens?style=flat)](https://github.com/Kameleon21/tokenlens/releases/latest)
-[![Checks](https://img.shields.io/github/actions/workflow/status/Kameleon21/tokenlens/ci.yml?branch=main&label=checks&style=flat)](https://github.com/Kameleon21/tokenlens/actions/workflows/ci.yml)
 [![Stars](https://img.shields.io/github/stars/Kameleon21/tokenlens?style=flat)](https://github.com/Kameleon21/tokenlens/stargazers)
 [![Contributors](https://img.shields.io/github/contributors/Kameleon21/tokenlens?style=flat)](https://github.com/Kameleon21/tokenlens/graphs/contributors)
 
