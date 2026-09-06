@@ -5,8 +5,13 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+## [0.2.0] - 2026-09-06
+
 ### Added
 
+- GoReleaser builds for macOS, Linux, and Windows on amd64 and arm64, with
+  release archives, SHA-256 checksums, and automated GitHub publishing.
+- Repeatable semantic release preparation and validation commands.
 - Tokyo Night Dark and Solarized Dark palettes.
 - Searchable theme popup with fuzzy filtering, keyboard navigation, live preview,
   Enter to apply, and Escape to restore the previous theme. Open with Ctrl+T.
@@ -16,6 +21,9 @@ User-visible changes are recorded here. Versions follow the conventions in
 - Default to the system timezone instead of UTC for calendar ranges and backend
   reports. `TZ` and `--timezone` remain explicit overrides.
 - Shift+T opens the theme picker instead of cycling palettes.
+  Use Ctrl+T to search and preview themes; Enter applies and Escape cancels.
+- To preserve the old UTC behavior, pass `--timezone UTC`.
+- Refreshed the README demo and added release, stars, and contributor badges.
 
 ## [0.1.0] - 2026-09-06
 
@@ -30,4 +38,5 @@ User-visible changes are recorded here. Versions follow the conventions in
 - Prominent active-theme name and cycle position in full and compact dashboard headers.
 - `--version` to print the application version without starting the dashboard.
 
+[0.2.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.1.0

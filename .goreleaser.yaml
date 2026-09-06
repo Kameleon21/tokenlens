@@ -1,0 +1,54 @@
+version: 2
+project_name: tokenlens
+
+builds:
+  - main: .
+    binary: tokenlens
+    env:
+      - CGO_ENABLED=0
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    # Version is compiled from internal/app/version.go and checked against the tag.
+    ldflags: [-s -w]
+
+archives:
+  - formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - LICENSE
+      - README.md
+      - CHANGELOG.md
+      - docs/usage.md
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+changelog:
+  disable: true
+
+release:
+  github:
+    owner: Kameleon21
+    name: tokenlens
+  name_template: "Tokenlens {{ .Tag }}"
+  footer: |
+    ### Install
+
+    Download the archive for your OS and architecture below and verify it against
+    the SHA-256 checksums. Extract `tokenlens` (`tokenlens.exe` on Windows) into
+    a directory on your PATH. Homebrew distribution is not configured.
+
+    Or install with Go 1.25+:
+
+    ```sh
+    go install github.com/Kameleon21/tokenlens@{{ .Tag }}
+    tokenlens --version
+    tokenlens --demo
+    ```
+
+    Real usage requires Bun or ccusage 20.0.20. Demo mode uses synthetic data.

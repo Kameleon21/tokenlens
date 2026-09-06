@@ -5,3 +5,5 @@
 coverage.out
 
 /exports/
+/dist/
+__pycache__/

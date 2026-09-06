@@ -1,68 +1,93 @@
 # Versioning and releases
 
-Tokenlens uses semantic versions (`MAJOR.MINOR.PATCH`) and Git tags with a `v`
-prefix, starting at `v0.1.0`. The application version and release notes are recorded in
-`internal/app/version.go` and `CHANGELOG.md`. Published versions are listed on
-[GitHub Releases](https://github.com/Kameleon21/tokenlens/releases).
+Tokenlens uses semantic versions (`MAJOR.MINOR.PATCH`) and immutable `v`-prefixed
+Git tags. `internal/app/version.go` is the single source of the application
+version, including for `go install` builds. The tag and newest dated section in
+`CHANGELOG.md` must match it. Untagged development builds can contain additional
+changes; include the Git commit when reporting them.
 
 ## Choosing a version
 
-- **Patch**, such as `0.1.1`: compatible bug fixes.
-- **Minor**, such as `0.2.0`: new features. While the major version is zero,
-  breaking changes also require a minor bump and explicit migration notes.
-- **Major**, such as `1.0.0`: the first stable interface commitment; afterward,
+- **Patch**: compatible bug fixes (`0.2.0` → `0.2.1`).
+- **Minor**: new features (`0.2.0` → `0.3.0`). Before 1.0, breaking changes also
+  require a minor bump and explicit migration notes.
+- **Major**: the first stable interface commitment (`1.0.0`); afterward,
   incompatible changes require a major bump.
-- Documentation-only changes normally remain under Unreleased until the next
-  application release.
 
-Treat documented CLI flags, configuration, and exported data formats as public
-interfaces. Never reuse or move a published version tag. Fix a bad release with
-a new version.
+Documented CLI flags, configuration, and exported data formats are public
+interfaces. Documentation-only changes normally wait until the next application
+release. This process currently supports stable versions only, not prereleases.
+Never reuse or move a published tag; fix a bad release with a new version.
 
 ## During development
 
-`internal/app/version.go` is the single source of the application version. The
-`--version` flag prints it for both local builds and `go install` builds; no
-special linker flags are required. An untagged checkout can include additional
-changes beyond that version, so use the Git commit when reporting development
-builds.
+Add user-visible changes under **Unreleased** in `CHANGELOG.md` in each PR. Do
+not bump the version for every commit. Run `make check` (Go 1.25+, Python 3, and
+Make required). CI also validates GoReleaser and builds all six release archives
+without publishing, including on pull requests.
 
-Add user-visible changes to the Unreleased section of `CHANGELOG.md` in each PR.
-Keep entries concise, describe resulting behavior, and call out breaking changes.
-Do not bump the version for every commit.
+## Prepare and review
 
-## Preparing a release
+1. Start a release branch from current `main`.
+2. Run `make release-prepare BUMP=patch` (or `minor` / `major`). This bumps the
+   application version, moves Unreleased notes into a dated release section,
+   and leaves an empty Unreleased section. Review the notes and migration advice.
+3. Install the GoReleaser version recorded in `.goreleaser-version`, using the
+   [official installation instructions](https://goreleaser.com/install/).
+   Run `make release-snapshot`. It runs checks and creates archives and SHA-256
+   checksums under `dist/` without creating a tag or publishing a release.
+   Snapshots have a development archive version; the binary retains the source
+   version. Check the native binary with `--version` and try `--demo`.
+4. Commit, push, and open a release PR. Wait for both Checks jobs to pass and
+   obtain explicit maintainer approval before merging.
 
-1. Create a release PR that sets `Version` in `internal/app/version.go` to the
-   chosen number. Move Unreleased entries under a heading such as
-   `## [0.1.0] - YYYY-MM-DD`, using the actual release date, and leave an empty
-   Unreleased section for future work.
-2. Run `go test -race ./...`, `go vet ./...`, and `go build -o bin/tokenlens .`.
-   Verify `./bin/tokenlens --version` matches the intended version and try
-   `./bin/tokenlens --demo`. Check formatting and wait for GitHub CI to pass.
-3. Obtain explicit maintainer approval to merge. After merging, update local
-   `main`, confirm the working tree is clean, and confirm the intended commit's
-   GitHub checks passed. Publish only the approved release commit.
-4. Copy that version's changelog entries into a release notes file. Create and
-   push an annotated tag, then publish using the terminal's `gh` CLI. For the
-   first release, after replacing the example commit with the verified full SHA:
+## Publish
 
-   ```sh
-   git tag -a v0.1.0 APPROVED_COMMIT_SHA -m "Tokenlens v0.1.0"
-   git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin v0.1.0
-   gh release create v0.1.0 --verify-tag --title "Tokenlens v0.1.0" --notes-file /tmp/tokenlens-release-notes.md
-   ```
+After the approved release PR is merged:
 
-   Adapt the version and notes path for subsequent releases. `--verify-tag`
-   prevents accidentally creating a release against a new, unintended tag.
-5. Verify `gh release view v0.1.0` and the tag-triggered checks using `gh run list`.
-   Check installation of the exact release:
+```sh
+git switch main
+git pull --ff-only
+make release-tag
+```
 
-   ```sh
-   go install github.com/Kameleon21/tokenlens@v0.1.0
-   tokenlens --version
-   ```
+The tagging command requires Git and an authenticated `gh` CLI with repository
+write access. It verifies a clean local `main`, fetches remote main and tags,
+requires local main to equal remote main, rejects existing tags, and checks that
+the latest Checks run on that exact commit passed. It then creates and pushes an
+annotated tag. Running this command is the explicit publishing step; merging a
+PR alone does not publish anything.
 
-The initial distribution uses Go installation and GitHub's source archives.
-There is no automatic release publishing or prebuilt binary upload. A merged
-feature PR by itself does not create a release.
+The tag-triggered Release workflow validates the tag, changelog, and main-branch
+ancestry, reruns project checks, then invokes the pinned GoReleaser version to:
+
+- Build macOS, Linux, and Windows binaries for amd64 and arm64 without CGO.
+- Package tar.gz archives (zip on Windows), with license and documentation.
+- Generate SHA-256 checksums and publish assets to GitHub Releases.
+- Use the version's changelog entries as release notes, with install instructions.
+
+Only the publishing job receives `contents: write`; it uses GitHub's built-in
+`GITHUB_TOKEN`. No additional secret or Homebrew tap is required. The setup
+follows [Oku's release workflow](https://github.com/Kameleon21/oku/blob/develop/.github/workflows/release.yml)
+and [build configuration](https://github.com/Kameleon21/oku/blob/develop/.goreleaser.yaml),
+with Tokenlens's curated changelog and version checks.
+
+## Verify or recover
+
+```sh
+gh run list --workflow release.yml
+gh release view v0.2.0
+go install github.com/Kameleon21/tokenlens@v0.2.0
+tokenlens --version
+```
+
+Replace the example version with the version just tagged. Wait for the Release
+workflow to succeed and verify six platform archives plus the checksum file.
+Download and extract your platform's archive, verify its checksum, and run
+`tokenlens --version` and `tokenlens --demo`. Real usage still needs Bun or
+ccusage 20.0.20; downloaded binaries do not need Go.
+
+If the tag push fails, inspect local and remote tags before retrying: the local
+annotated tag may already exist. If publishing fails, inspect the workflow logs
+and any partial GitHub release before rerunning the failed job. Never move the
+tag. If code or metadata must change, prepare a new patch release instead.
