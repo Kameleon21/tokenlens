@@ -3,10 +3,10 @@ module github.com/Kameleon21/tokenlens
 go 1.25.0
 
 require (
-	github.com/charmbracelet/bubbles v0.21.1
+	github.com/charmbracelet/bubbles v1.0.0
 	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.0
-	github.com/charmbracelet/x/ansi v0.11.5
+	github.com/charmbracelet/x/ansi v0.11.6
 	github.com/muesli/termenv v0.16.0
 	github.com/pelletier/go-toml/v2 v2.4.3
 	golang.org/x/image v0.41.0
