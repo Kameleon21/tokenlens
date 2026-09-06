@@ -516,7 +516,7 @@ func (m model) compactView() string {
 		badge = "DEMO · SYNTHETIC"
 	}
 	b.WriteString(bright.Render("◈  TOKENLENS") + "  " + muted.Render("/  usage, in focus") + "   " + accent.Render(badge) + "\n")
-	b.WriteString(muted.Render(clip(m.o.Range.String()+"  ·  "+m.o.TZ, w)) + "\n\n")
+	b.WriteString(muted.Render(clip(m.o.Range.String()+"  ·  "+m.o.TZ, w)) + "\n" + m.themeIndicator() + "\n")
 	u := total(filtered(m.s.Sections["daily"], m.agent, m.modelFilter))
 	summary := "Tokens  " + bright.Render(format(u.Tokens, false)) + "    Estimated cost (" + m.fx.Currency + ")  " + accent.Render(m.fx.format(u.Cost))
 	if m.s.Loaded.IsZero() {
@@ -690,7 +690,7 @@ func (m model) compactView() string {
 			}
 		}
 	}
-	footer := muted.Render("T " + themeLabel(m.o.Theme) + "  ? help  q quit  1–5 views  c metric  t range  r refresh")
+	footer := muted.Render("Shift+T theme  ? help  q quit  1–5 views  c metric  t range  r refresh")
 	content := b.String()
 	lines := strings.Split(content, "\n")
 	maxLines := m.height - 4

@@ -61,8 +61,9 @@ func (m model) View() string {
 	if m.o.Demo {
 		mode = "DEMO · SYNTHETIC"
 	}
-	left := bright.Render("◈  T O K E N L E N S") + "   " + muted.Render("Your agent usage, in focus")
-	right := accent.Render(mode) + "    " + muted.Render("[t] range   [r] refresh   [?] controls")
+	left := bright.Render("◈  T O K E N L E N S") + "   " + muted.Render(mode)
+	right := m.themeIndicator()
+	left = clip(left, max(1, w-ansi.StringWidth(right)-2))
 	head.WriteString(left + strings.Repeat(" ", max(2, w-ansi.StringWidth(left)-ansi.StringWidth(right))) + right + "\n")
 	fresh := "Waiting for first snapshot"
 	if !m.s.Loaded.IsZero() {
@@ -169,7 +170,7 @@ func (m model) View() string {
 		}
 		body = row(order[0], order[1], topH) + "\n" + row(order[2], order[3], bottomH)
 	}
-	footer := muted.Render("T " + themeLabel(m.o.Theme) + "  [ / ] widgets  enter open  v layout  e currency  p preset  b plan  o export  c metric  ? help  q quit")
+	footer := muted.Render("Shift+T theme  [ / ] widgets  enter open  v layout  e currency  p preset  b plan  o export  c metric  ? help  q quit")
 	content := fit(prefix+body, w, h-1) + "\n" + fit(footer, w, 1)
 	return themeRender(lipgloss.NewStyle().Foreground(ink).Padding(1, 2).Render(content), m.o.Theme, m.width, m.height)
 }

@@ -45,6 +45,18 @@ func themeLabel(name string) string {
 	return paletteFor(name).label
 }
 
+// themeIndicator stays visible above the content, including in compact terminals.
+func (m model) themeIndicator() string {
+	index := 1
+	for i, name := range themeNames {
+		if name == m.o.Theme {
+			index = i + 1
+			break
+		}
+	}
+	return accent.Bold(true).Render(fmt.Sprintf("Theme: %s  [%d/%d]", themeLabel(m.o.Theme), index, len(themeNames))) + muted.Render("  Shift+T next")
+}
+
 func applyTheme(name string) {
 	activeTheme = name
 	p := paletteFor(name)
