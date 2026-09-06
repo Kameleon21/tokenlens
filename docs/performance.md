@@ -8,7 +8,11 @@ Reports now have a configurable reuse window (five minutes by default). A fresh 
 
 This trades immediate freshness for responsiveness within the configured window. The cached label and original timestamp remain visible. Use `r` or `--cache-ttl 0` when you need an updated report. No-cache mode disables both report caches.
 
-These changes do not make an uncached ccusage invocation faster. A first-ever Bun download, log scan, and online pricing lookup can still take time. Installed binaries avoid Go compilation on each launch. The explicit `--offline` option can avoid online pricing work, with different estimates possible.
+Release archives now include the pinned native ccusage binary in `libexec`, removing Bun installation from that distribution path. Tokenlens resolves its own executable symlinks before finding the companion. Go/source installs still fall back to installed ccusage or Bun.
+
+Default loads use a dated local LiteLLM catalog through ccusage pricing overrides. Price refresh runs independently with an eight-second timeout, six-hour freshness window, and one-minute retry cooldown. Updated prices invalidate report reuse and trigger recalculation after an in-flight report completes. `--offline` disables those downloads, and `--no-cache` disables persistent price reuse. Unknown pricing remains unavailable/partial, with provenance included in JSON exports.
+
+All four report sections still load together. The implementation avoids the extra state and duplicate scans of a separate preliminary report. Local log scanning remains the main unavoidable first-load work; large-history optimization should be measured separately. Custom ccusage configuration or an explicit backend retains its original pricing path for compatibility.
 
 ## Next step: a local usage engine (proposal)
 

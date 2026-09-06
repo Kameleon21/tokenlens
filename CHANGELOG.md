@@ -5,6 +5,17 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+### Added
+
+- Native ccusage bundled for all six release platforms, with verified dependency integrity.
+- Local model prices and background refresh for faster uncached loads, with price dates and explicit incomplete-cost coverage.
+- A checksum-verifying macOS/Linux release updater that keeps the complete bundle together and preserves preferences.
+
+### Changed
+
+- Default reports no longer wait for online model pricing. Custom ccusage configurations and explicitly selected backends retain their original pricing behavior.
+- JSON exports include price provenance and models with unavailable costs.
+
 ## [0.3.0] - 2026-09-06
 
 ### Added

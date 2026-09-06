@@ -64,7 +64,7 @@ func (m model) writeExport(kind string) (string, error) {
 			u := r.Usage
 			out = append(out, exportRow{r.Name, r.Agent, jsonMetric(u.Tokens, 1), jsonMetric(u.Cost, 1), jsonMetric(u.Cost, m.fx.Rate), jsonMetric(u.Input, 1), jsonMetric(u.Output, 1), jsonMetric(u.Read, 1), jsonMetric(u.Write, 1)})
 		}
-		data, e = json.MarshalIndent(map[string]any{"view": views[m.view], "grouping": m.o.Group, "range": m.o.Range, "timezone": m.o.TZ, "agent_filter": m.agent, "model_filter": m.modelFilter, "currency": m.fx.Currency, "exchange_rate": m.fx.Rate, "exchange_date": m.fx.Date, "exchange_source": m.fx.Source, "snapshot_time": m.s.Loaded, "demo": m.o.Demo, "rows": out}, "", "  ")
+		data, e = json.MarshalIndent(map[string]any{"view": views[m.view], "grouping": m.o.Group, "range": m.o.Range, "timezone": m.o.TZ, "agent_filter": m.agent, "model_filter": m.modelFilter, "currency": m.fx.Currency, "exchange_rate": m.fx.Rate, "exchange_date": m.fx.Date, "exchange_source": m.fx.Source, "snapshot_time": m.s.Loaded, "price_source": m.s.PriceSource, "price_date": m.s.PriceDate, "unpriced_models": m.s.Unpriced, "demo": m.o.Demo, "rows": out}, "", "  ")
 	case "csv":
 		var b bytes.Buffer
 		cw := csv.NewWriter(&b)

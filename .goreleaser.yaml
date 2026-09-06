@@ -1,6 +1,10 @@
 version: 2
 project_name: tokenlens
 
+before:
+  hooks:
+    - python3 scripts/bundle_backend.py
+
 builds:
   - main: .
     binary: tokenlens
@@ -23,6 +27,14 @@ archives:
       - README.md
       - CHANGELOG.md
       - docs/usage.md
+      - docs/releases.md
+      - scripts/install_release.py
+      - third_party/*
+      - src: '.release-backends/{{ .Os }}_{{ .Arch }}/ccusage{{ if eq .Os "windows" }}.exe{{ end }}'
+        dst: 'libexec'
+        strip_parent: true
+        info:
+          mode: 0755
 
 checksum:
   name_template: "{{ .ProjectName }}_{{ .Version }}_checksums.txt"
@@ -40,8 +52,10 @@ release:
     ### Install
 
     Download the archive for your OS and architecture below and verify it against
-    the SHA-256 checksums. Extract `tokenlens` (`tokenlens.exe` on Windows) into
-    a directory on your PATH. Homebrew distribution is not configured.
+    the SHA-256 checksums. Extract the entire archive and keep `libexec` beside
+    `tokenlens` (`tokenlens.exe` on Windows). Add that directory to your PATH.
+    macOS/Linux users can use `python3 scripts/install_release.py` to install
+    and update the complete release with checksum verification.
 
     Or install with Go 1.25+:
 
@@ -51,4 +65,6 @@ release:
     tokenlens --demo
     ```
 
-    Real usage requires Bun or ccusage 20.0.20. Demo mode uses synthetic data.
+    Release archives include native ccusage and Tokenlens includes local model
+    prices with background refresh. Go installations still need Bun or ccusage
+    20.0.20. Demo mode uses synthetic data.

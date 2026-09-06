@@ -30,7 +30,7 @@ func snapshotCachePath(o Options, r datefilter.Range) (string, error) {
 		}
 		dir = filepath.Join(root, "tokenlens")
 	}
-	key := sha256.Sum256([]byte("v1\x00" + o.Bin + fmt.Sprint(o.Offline) + "\x00" + o.TZ + "\x00" + r.Since + "\x00" + r.Until))
+	key := sha256.Sum256([]byte("v2\x00" + Version + o.priceRevision + o.Bin + fmt.Sprint(o.Offline) + "\x00" + o.TZ + "\x00" + r.Since + "\x00" + r.Until))
 	return filepath.Join(dir, hex.EncodeToString(key[:])+".json"), nil
 }
 func readSnapshotCache(o Options, r datefilter.Range) (Snapshot, error) {
@@ -49,7 +49,7 @@ func readSnapshotCache(o Options, r datefilter.Range) (Snapshot, error) {
 	if e = json.Unmarshal(b, &entry); e != nil {
 		return Snapshot{}, e
 	}
-	if entry.Version != 1 || entry.Snapshot.Loaded.IsZero() || entry.Snapshot.Loaded.After(time.Now().Add(time.Minute)) {
+	if entry.Version != 2 || entry.Snapshot.Loaded.IsZero() || entry.Snapshot.Loaded.After(time.Now().Add(time.Minute)) {
 		return Snapshot{}, fmt.Errorf("invalid cached snapshot")
 	}
 	if time.Since(entry.Snapshot.Loaded) > 7*24*time.Hour {
@@ -68,7 +68,7 @@ func writeSnapshotCache(o Options, r datefilter.Range, s Snapshot) error {
 	if e = os.MkdirAll(filepath.Dir(path), 0700); e != nil {
 		return e
 	}
-	b, e := json.Marshal(diskSnapshot{Version: 1, Snapshot: s})
+	b, e := json.Marshal(diskSnapshot{Version: 2, Snapshot: s})
 	if e != nil {
 		return e
 	}

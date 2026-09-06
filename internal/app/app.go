@@ -15,6 +15,8 @@ import (
 )
 
 type Options struct {
+	managedPrices                             bool
+	priceRevision                             string
 	preferences                               Preferences
 	configPath                                string
 	ShowVersion                               bool
@@ -59,7 +61,7 @@ func optionsWithLocalTimezone(args []string, now time.Time, detect func() (strin
 	f.StringVar(&o.TZ, "timezone", o.TZ, "IANA timezone (default system timezone; TZ overrides the system default)")
 	f.StringVar(&o.Bin, "ccusage", "ccusage", "ccusage executable path")
 	f.StringVar(&o.CacheDir, "cache-dir", "", "snapshot cache directory (default OS user cache / tokenlens)")
-	f.BoolVar(&o.Offline, "offline", false, "use ccusage cached pricing for speed (estimates may differ)")
+	f.BoolVar(&o.Offline, "offline", false, "disable background price downloads (use local prices)")
 	f.DurationVar(&o.CacheTTL, "cache-ttl", 5*time.Minute, "reuse recent reports for this long; 0 always reloads; r forces refresh")
 	f.BoolVar(&o.NoCache, "no-cache", false, "disable memory and on-disk usage snapshots")
 	f.StringVar(&o.Theme, "theme", "dark", strings.Join(themeNames, ", "))
@@ -143,6 +145,7 @@ func optionsWithLocalTimezone(args []string, now time.Time, detect func() (strin
 		return o, fmt.Errorf("invalid timezone %q", o.TZ)
 	}
 	o.Range, e = datefilter.Resolve(since, until, last, o.Group, now, loc)
+	o.managedPrices = !o.Demo && !provided["ccusage"] && !hasCCUsageConfig()
 	return o, e
 }
 

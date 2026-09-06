@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/Kameleon21/tokenlens/internal/datefilter"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"runtime"
 	"sort"
 	"time"
 )
@@ -46,8 +49,12 @@ type Row struct {
 	Metadata       map[string]json.RawMessage
 }
 type Snapshot struct {
-	Sections map[string][]Row
-	Loaded   time.Time
+	PriceDate     time.Time
+	PriceSource   string
+	PriceRevision string
+	Unpriced      []string
+	Sections      map[string][]Row
+	Loaded        time.Time
 }
 
 func metric(m map[string]json.RawMessage, keys ...string) Metric {
@@ -145,14 +152,33 @@ func backendArgs(r datefilter.Range, tz string) []string {
 	return a
 }
 func load(ctx context.Context, bin string, r datefilter.Range, tz string, offline ...bool) (Snapshot, error) {
+	return loadConfigured(ctx, bin, r, tz, len(offline) > 0 && offline[0], nil)
+}
+func loadWithPrices(ctx context.Context, o Options, r datefilter.Range, p priceCatalog) (Snapshot, error) {
+	if !o.managedPrices {
+		return load(ctx, o.Bin, r, o.TZ, o.Offline)
+	}
+	config, cleanup, err := p.configFile()
+	if err != nil {
+		return Snapshot{}, err
+	}
+	defer cleanup()
+	s, err := loadConfigured(ctx, o.Bin, r, o.TZ, true, []string{"--config", config})
+	if err == nil {
+		p.applyCoverage(&s)
+	}
+	return s, err
+}
+func loadConfigured(ctx context.Context, bin string, r datefilter.Range, tz string, offline bool, extra []string) (Snapshot, error) {
 	path, prefix, e := backendCommand(bin)
 	if e != nil {
 		return Snapshot{}, e
 	}
 	args := backendArgs(r, tz)
-	if len(offline) > 0 && offline[0] {
+	if offline {
 		args = append(args, "--offline")
 	}
+	args = append(args, extra...)
 	cmd := exec.CommandContext(ctx, path, append(prefix, args...)...)
 	configureBackend(cmd)
 	var stderr bytes.Buffer
@@ -282,7 +308,29 @@ func names(s Snapshot, kind string) []string {
 	return out
 }
 
+func bundledBackend(executable string) string {
+	real, err := filepath.EvalSymlinks(executable)
+	if err != nil {
+		return ""
+	}
+	name := "ccusage"
+	if runtime.GOOS == "windows" {
+		name += ".exe"
+	}
+	path := filepath.Join(filepath.Dir(real), "libexec", name)
+	if resolved, err := exec.LookPath(path); err == nil {
+		return resolved
+	}
+	return ""
+}
 func backendCommand(bin string) (string, []string, error) {
+	if bin == "ccusage" {
+		if executable, err := os.Executable(); err == nil {
+			if path := bundledBackend(executable); path != "" {
+				return path, nil, nil
+			}
+		}
+	}
 	if path, err := exec.LookPath(bin); err == nil {
 		return path, nil, nil
 	}

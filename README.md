@@ -18,10 +18,23 @@ See your coding-agent token usage and estimated costs in your terminal. Compare 
 
 Download a prebuilt archive for your OS and architecture from
 [GitHub Releases](https://github.com/Kameleon21/tokenlens/releases), verify its
-SHA-256 checksum, and extract the binary into a directory on your `PATH`.
+SHA-256 checksum, and extract the **whole archive**. Keep the `libexec` directory
+beside `tokenlens` (`tokenlens.exe` on Windows), and add the extracted directory
+to your `PATH`. Release bundles include native ccusage; Bun is not required.
 
-Real usage needs either [Bun](https://bun.sh) or **ccusage 20.0.20**.
-Alternatively, install from source with **Go 1.25+**:
+On macOS/Linux, the archive's updater installs the complete release and verifies
+its checksum. Run it again whenever you want the latest published release:
+
+```sh
+python3 scripts/install_release.py
+```
+
+Its default executable location is `~/.local/bin/tokenlens`; keep that directory
+on your `PATH`. Use `--bin-dir "$HOME/go/bin"` to replace a previous Go installation.
+See the [release guide](docs/releases.md#installing-and-updating) for details.
+
+Alternatively, install from source with **Go 1.25+** and either
+[Bun](https://bun.sh) or **ccusage 20.0.20**:
 
 ```sh
 go install github.com/Kameleon21/tokenlens@latest
@@ -32,7 +45,9 @@ Make sure Go's binary directory (usually `~/go/bin`) is on your `PATH`.
 From a local checkout, use `go install .` or `go run .`.
 Run `tokenlens --version` to check your version. See the [changelog](CHANGELOG.md)
 and [release guide](docs/releases.md) for version history and release conventions.
-Tokenlens uses installed ccusage when available; otherwise Bun downloads and runs the pinned version automatically. The first download needs internet access.
+Tokenlens checks for its bundled backend first, then installed ccusage, then Bun.
+`go install` does not install the companion backend. `--ccusage /path/to/backend`
+explicitly selects another backend and keeps its own pricing behavior.
 
 Try it without any usage logs or backend:
 
@@ -76,16 +91,17 @@ Recent reports are reused for **five minutes**, so reopening Tokenlens or return
 - Press `r` to fetch new usage immediately. Pressing it again during the same load keeps that request running.
 - Currency, grouping, and filter changes do not rerun the usage report.
 - Use `--cache-ttl 30s` for a shorter reuse window, or `--cache-ttl 0` to always reload.
-- Use `--offline` for ccusage's cached pricing mode. It can be faster, but cost estimates may differ. Currency conversion still needs an exchange-rate request.
-- `--no-cache` disables report caching. Saved reports live in your OS user cache under `tokenlens`; `--cache-dir` changes that location.
+- Model prices come from a bundled or downloaded LiteLLM catalog. Older prices refresh in the background, without delaying the first report. The price date and incomplete coverage are shown.
+- Use `--offline` to disable background price downloads. Currency conversion still needs an exchange-rate request.
+- `--no-cache` disables report and price-cache reads/writes. Saved reports live in your OS user cache under `tokenlens`; `--cache-dir` changes that location.
 
-First loads and dates without a saved report still wait for ccusage. See the [performance plan](docs/performance.md) for how Tokenlens could eventually read usage logs itself.
+First loads and dates without a saved report still scan logs through ccusage. See the [performance plan](docs/performance.md) for how Tokenlens could eventually read usage logs itself.
 
 ## What the numbers mean
 
 Costs are estimates from ccusage, not your subscription bill. Currency conversion uses the latest published ECB reference rate via Frankfurter, including for historical usage. Missing values are shown as unavailable.
 
-Usage reports stay local. Non-USD conversion sends only the currency request. Cached reports and exports can contain private project or session names. Demo mode uses synthetic data and makes no backend or exchange-rate requests.
+Usage reports stay local. Background pricing downloads fetch the public LiteLLM catalog; no usage logs are sent. Non-USD conversion sends only the currency request. Cached reports and exports can contain private project or session names. Demo mode uses synthetic data and makes no backend or exchange-rate requests.
 
 See the [usage reference](docs/usage.md) for billing comparisons, exports, cache details, and data limits. Run `tokenlens --help` for all flags.
 

@@ -36,6 +36,10 @@ type exchangeMsg struct {
 	id       int
 }
 type model struct {
+	prices                                priceCatalog
+	priceLoading                          bool
+	priceAttempt                          time.Time
+	priceErr                              string
 	choosingTheme                         bool
 	themeOriginal                         string
 	themeCursor                           int
@@ -87,9 +91,20 @@ func newModel(ctx context.Context, o Options) model {
 	if o.preferences.Layout == "stacked" {
 		layout = 1
 	}
-	return model{ctx: ctx, o: o, width: 100, height: 32, cost: o.preferences.Display != "tokens", compactNumbers: o.preferences.CompactNumbers, layout: layout, spin: sp, input: ti, fx: usdExchange()}
+	var prices priceCatalog
+	if o.managedPrices {
+		prices = initialPrices(o)
+		o.priceRevision = prices.revision()
+	}
+	return model{prices: prices, ctx: ctx, o: o, width: 100, height: 32, cost: o.preferences.Display != "tokens", compactNumbers: o.preferences.CompactNumbers, layout: layout, spin: sp, input: ti, fx: usdExchange()}
 }
-func (m model) Init() tea.Cmd { return func() tea.Msg { return "initial-load" } }
+func (m model) Init() tea.Cmd {
+	initial := func() tea.Msg { return "initial-load" }
+	if m.o.managedPrices && !m.o.Offline {
+		return tea.Batch(initial, priceTick())
+	}
+	return initial
+}
 func (m *model) refresh(r datefilter.Range, force ...bool) tea.Cmd {
 	// Repeated refresh presses must not restart an already running report.
 	if m.loading && m.pending == r {
@@ -107,6 +122,7 @@ func (m *model) refresh(r datefilter.Range, force ...bool) tea.Cmd {
 	m.request++
 	id := m.request
 	o := m.o
+	prices := m.prices
 	m.pending = r
 	fxCmd := m.refreshExchange()
 	backendCmd := func() tea.Msg {
@@ -117,7 +133,7 @@ func (m *model) refresh(r datefilter.Range, force ...bool) tea.Cmd {
 			loc, _ := time.LoadLocation(o.TZ)
 			s = demo(r, loc)
 		} else {
-			s, e = load(ctx, o.Bin, r, o.TZ, o.Offline)
+			s, e = loadWithPrices(ctx, o, r, prices)
 		}
 		if e == nil {
 			_ = writeSnapshotCache(o, r, s)
@@ -139,7 +155,7 @@ func (m *model) refresh(r datefilter.Range, force ...bool) tea.Cmd {
 		}
 		return backendCmd()
 	}
-	return tea.Batch(m.spin.Tick, fxCmd, reportCmd)
+	return tea.Batch(m.spin.Tick, fxCmd, reportCmd, m.refreshPrices(forced))
 }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch v := msg.(type) {
@@ -147,6 +163,29 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if v == "initial-load" {
 			return m, m.refresh(m.o.Range)
 		}
+	case priceTickMsg:
+		return m, tea.Batch(m.refreshPrices(false), priceTick())
+	case pricesMsg:
+		m.priceLoading = false
+		if v.err != nil {
+			m.priceErr = v.err.Error()
+			return m, nil
+		}
+		changed := v.catalog.revision() != m.o.priceRevision
+		m.priceErr = ""
+		m.prices = v.catalog
+		m.o.priceRevision = v.catalog.revision()
+		if !changed {
+			if m.s.PriceRevision == m.o.priceRevision {
+				m.s.PriceDate = v.catalog.Fetched
+			}
+			return m, nil
+		}
+		m.reports = nil
+		if !m.loading {
+			return m, m.refresh(m.o.Range, true)
+		}
+		return m, nil
 	case tea.MouseMsg:
 		if m.choosingTheme {
 			return m, nil
@@ -175,8 +214,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.cached = true
 		m.s, m.o.Range = v.s, v.r
+		if m.o.managedPrices && m.s.PriceRevision == m.o.priceRevision {
+			m.s.PriceDate = m.prices.Fetched
+		}
 		m.cursor, m.details = 0, false
-		m.remember(v.r, v.s)
+		m.remember(v.r, m.s)
+		if m.o.managedPrices && m.s.PriceRevision != m.o.priceRevision {
+			return m, m.refresh(v.r, true)
+		}
 		return m, nil
 	case exportedMsg:
 		if v.err != nil {
@@ -210,6 +255,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.o.Range = v.r
 			m.cursor = 0
 			m.details = false
+		}
+		if v.err == nil && m.o.managedPrices && v.s.PriceRevision != m.o.priceRevision {
+			return m, m.refresh(v.r, true)
 		}
 	case tea.KeyMsg:
 		key := v.String()
@@ -564,6 +612,8 @@ func (m model) compactView() string {
 	} else {
 		b.WriteString(clip(summary, w) + "\n")
 	}
+	b.WriteString(muted.Render(clip(m.pricingStatus(), w)) + "\n")
+	headerExtra++
 	fresh := "not loaded"
 	if !m.s.Loaded.IsZero() {
 		fresh = "snapshot " + m.s.Loaded.Local().Format("Jan 02 15:04:05")

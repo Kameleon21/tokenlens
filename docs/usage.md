@@ -67,18 +67,18 @@ All internal costs remain USD. Currency switching changes presentation, not toke
 
 There are two independent caches:
 
-1. **Bun's package cache** stores ccusage after its first download.
-2. **Tokenlens snapshots** store the last report for each range, timezone, backend, and pricing mode in the OS user cache directory under `tokenlens`.
+1. **Backend package cache**: only Go/source installations that fall back to Bun need a first ccusage download. Release archives include the backend in `libexec`.
+2. **Tokenlens snapshots**: reports are cached for each range, timezone, backend, application version, and price revision. Fresh snapshots (five minutes by default) skip ccusage; older matching snapshots remain visible during refresh. Up to 16 ranges are held in memory. Snapshots older than seven days are not reused.
+3. **Model prices**: Tokenlens includes a dated LiteLLM catalog, prefers a newer valid downloaded copy, and checks for updates in the background after six hours. Press `r` to request new usage and a price update; price downloads have a one-minute retry cooldown and an eight-second timeout. Changed prices trigger another report after any current load finishes.
 
-A matching snapshot younger than `--cache-ttl` (default five minutes) is reused without launching ccusage. Older matching snapshots appear while a fresh report loads. Press `r` to force a fresh report; repeated presses while the same range is loading do not restart it. Up to 16 visited ranges are also kept in memory. Set `--cache-ttl 0` to always reload. A new range still needs ccusage. Its cached status and timestamp are visible. Snapshots older than seven days are not used. Files are private (0600 on Unix), written atomically, and contain usage details; don't publish your cache directory. Use `--no-cache` to disable snapshot reads/writes or `--cache-dir` to select a directory. Demo mode never persists snapshots. Cached files are not automatically deleted when they expire; you can remove Tokenlens's cache directory to clear them.
+`--cache-dir` selects the report/price cache directory. `--no-cache` disables disk price caching and all usage snapshot caching. It does not prohibit network requests. `--offline` prohibits background price downloads; it still uses the newest available local catalog. Currency conversion has its own request and is not disabled by this flag. Demo mode does not read or write these caches or download prices.
 
-Normal ccusage pricing refreshes can still take tens of seconds even with the package installed. **`--offline`** uses ccusage's cached-pricing mode and can be much faster:
+Price dates are independent from report timestamps. Missing exact model prices or rates for a used token category make that model's cost unavailable, and aggregate costs become partial. A zero is only treated as a free rate when it is explicitly present in the catalog. Model aliases without exact catalog coverage can therefore appear unpriced even when ccusage could guess a match. JSON exports include the price source, date, and unpriced models.
 
-```sh
-go run . --currency EUR --offline
-```
+The fast path supplies rates to ccusage through its supported pricing overrides; ccusage still applies its agent-specific accounting, recorded-cost handling, and supported pricing tiers. Existing ccusage configuration (`.ccusage/ccusage.json`, or ccusage.json in its Claude configuration directories) and explicit `--ccusage` selections retain ccusage-managed pricing instead. In that compatibility mode, `--offline` means ccusage's embedded catalog and the fast-path coverage metadata is unavailable.
 
-It is explicitly labeled because estimates **may differ materially** from online pricing; Tokenlens never enables it silently. This flag affects ccusage, not the separate exchange-rate request. Snapshot and exchange-rate refreshes run independently. Switching currency only fetches an exchange rate. Superseded loads are canceled, backend loads time out after two minutes, and macOS/Linux cancellation also terminates Bun's installer children.
+Files are private (0600 on Unix), written atomically, and can contain usage details. Don't publish your cache directory. Expired files are not automatically deleted. Backend loads time out after two minutes; macOS/Linux cancellation terminates Bun's installer children too. Currency changes do not rescan usage.
+
 
 ## Data limits
 
@@ -95,7 +95,7 @@ ccusage daily --sections daily,weekly,monthly,session --by-agent --json \
 - Source-level reported zero remains zero. Tokenlens cannot tell when an upstream source substitutes zero for missing data.
 - Model token totals are derived only when all four normalized input/output/cache categories exist. Session attribution follows ccusage's semantics.
 
-There is no local log parser, telemetry, background synchronization, or Tokenlens npm launcher. The optional automatic backend invocation through Bun is separate from packaging Tokenlens itself.
+There is no local log parser, telemetry, usage upload, or Tokenlens npm launcher. Only public pricing data refreshes in the background.
 
 ## Exports
 
