@@ -82,7 +82,7 @@ func (m model) stackedChart(w, h int) string {
 	for _, mr := range selected.Models {
 		parts = append(parts, lipgloss.NewStyle().Foreground(color(mr.Name)).Render(safe(mr.Name))+" "+m.formatMetric(m.value(mr), m.cost))
 	}
-	lines = append(lines, bright.Render(selected.Name)+"  "+m.formatMetric(known(totals[cursor-start]), m.cost), clip(strings.Join(parts, " · "), w))
+	lines = append(lines, bright.Render(m.formatPeriod(selected.Name))+"  "+m.formatMetric(known(totals[cursor-start]), m.cost), clip(strings.Join(parts, " · "), w))
 	return strings.Join(lines, "\n")
 }
 func (m model) cacheChart(w, h int) string {

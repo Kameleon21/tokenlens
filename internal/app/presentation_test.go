@@ -329,3 +329,78 @@ func TestHelpScrollsAndKeepsTabSelection(t *testing.T) {
 		t.Fatal("help did not close cleanly")
 	}
 }
+
+func TestCalendarPreferencesAcrossViews(t *testing.T) {
+	m := newModel(context.Background(), Options{TZ: "America/Los_Angeles", Group: "daily"})
+	m.o.Range.Since, m.o.Range.Until = "2026-09-06", "2026-09-07"
+	usage := Usage{Cost: known(1), Tokens: known(100), Input: known(10), Output: known(20), Read: known(70), Write: known(0)}
+	period := Row{Name: "2026-09-06", Agent: "all", Usage: usage, Models: []Row{{Name: "sample", Usage: usage}}, Agents: []Row{{Name: "codex", Usage: usage}}}
+	m.s = Snapshot{Sections: map[string][]Row{"daily": {period}, "session": {{Name: "2026-09-06", Usage: usage}}}}
+	m.fx = Exchange{Currency: "EUR", Rate: 0.9, Date: "2026-09-06"}
+	for _, tc := range []struct{ preference, date, month string }{
+		{"european", "6 Sep 2026", "Sep 2026"}, {"us", "Sep 6, 2026", "Sep 2026"}, {"iso", "2026-09-06", "2026-09"},
+	} {
+		m.o.preferences.DateFormat = tc.preference
+		if got := m.formatPeriod("2026-09"); got != tc.month {
+			t.Fatal(got)
+		}
+		for _, invalid := range []string{"session-name", "2026-02-30", ""} {
+			if m.formatPeriod(invalid) != invalid {
+				t.Fatal("changed non-period label")
+			}
+		}
+		for view := 0; view < 5; view++ {
+			m.view = view
+			for _, size := range [][2]int{{80, 30}, {160, 60}} {
+				m.width, m.height = size[0], size[1]
+				output := ansi.Strip(m.View())
+				if !strings.Contains(output, tc.date) {
+					t.Fatalf("view %d size %v: %s", view, size, output)
+				}
+				if lipgloss.Width(output) > m.width || lipgloss.Height(output) > m.height {
+					t.Fatal("layout overflow")
+				}
+			}
+		}
+		m.view = 0
+		for name, output := range map[string]string{
+			"stacked": m.stackedChart(90, 15), "activity": m.activityChart(110, 15),
+			"inspector": m.drilldown(150, 30), "svg": m.exportSVG([]Row{period}),
+			"exchange": m.exchangeStatus(), "input": m.rangeInput(),
+		} {
+			if !strings.Contains(ansi.Strip(output), tc.date) {
+				t.Fatalf("%s: %s", name, output)
+			}
+		}
+		if m.canonicalDate(tc.date) != "2026-09-06" {
+			t.Fatal("date does not round trip")
+		}
+		m.view = 4
+		if m.rowLabel(period) != period.Name {
+			t.Fatal("formatted session identity as date")
+		}
+		if period.Name != "2026-09-06" || m.fx.Date != "2026-09-06" {
+			t.Fatal("mutated source dates")
+		}
+	}
+	m.o.Range.Since, m.o.Range.Until = "", ""
+	if m.formatRange(m.o.Range) != "beginning → latest" || m.rangeInput() != "* → *" {
+		t.Fatal("open bounds lost")
+	}
+}
+
+func TestLocalizedRangeEditor(t *testing.T) {
+	for _, input := range []string{
+		"6 Sep 2026 → 7 Sep 2026", "6 Sep 2026 to 7 Sep 2026",
+		"2026-09-06 2026-09-07", "20260906 20260907",
+	} {
+		m := newModel(context.Background(), Options{TZ: "UTC", Group: "daily"})
+		m.editing = "range"
+		m.input.SetValue(input)
+		updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
+		m = updated.(model)
+		if m.err != "" || m.editing != "" || cmd == nil || m.pending.Since != "2026-09-06" || m.pending.Until != "2026-09-07" {
+			t.Fatalf("%q: error %s, pending %+v", input, m.err, m.pending)
+		}
+	}
+}
