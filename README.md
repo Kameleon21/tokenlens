@@ -35,7 +35,7 @@ tokenlens --demo
 tokenlens --currency EUR
 tokenlens weekly --last 8
 tokenlens --since 2026-08-01 --until 2026-08-31
-tokenlens --theme light
+tokenlens --theme nord  # Shift+T cycles themes inside the app
 ```
 
 The default date range is this calendar month. Dates are inclusive. The timezone is UTC unless you set `TZ` or `--timezone`.

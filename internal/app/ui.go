@@ -20,7 +20,7 @@ import (
 
 var ink = lipgloss.Color("#E3E9F3")
 var muted = lipgloss.NewStyle().Foreground(lipgloss.Color("#8794A9"))
-var accent = lipgloss.NewStyle().Foreground(lipgloss.Color("#80D8C3"))
+var accent = lipgloss.NewStyle().Foreground(lipgloss.Color(paletteFor(activeTheme).accent))
 var bright = lipgloss.NewStyle().Foreground(ink).Bold(true)
 var views = []string{"Overview", "Agents", "Models", "Tokens / cache", "Sessions"}
 
@@ -66,6 +66,10 @@ type model struct {
 }
 
 func newModel(ctx context.Context, o Options) model {
+	if o.Theme == "" {
+		o.Theme = "dark"
+	}
+	applyTheme(o.Theme)
 	if o.Currency == "" {
 		o.Currency = "USD"
 	}
@@ -334,8 +338,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.o.Currency = cycle([]string{"USD", "EUR", "GBP", "JPY"}, m.o.Currency)
 			return m, m.refreshExchange()
 		case "T":
-			m.o.Theme = cycle([]string{"dark", "light", "ascii"}, m.o.Theme)
+			m.o.Theme = cycle(themeNames, m.o.Theme)
 			applyTheme(m.o.Theme)
+			m.spin.Style = accent
 		case "p":
 			m.preset = (m.preset + 1) % 4
 			m.notice = []string{"This calendar month", "This billing cycle", "Last 30 days", "Since August 1"}[m.preset]
@@ -495,10 +500,7 @@ func color(name string) lipgloss.Color { return colorFor(name, activeTheme) }
 func colorFor(name, theme string) lipgloss.Color {
 	h := fnv.New32a()
 	_, _ = h.Write([]byte(name))
-	p := []string{"#80D8C3", "#AFABED", "#E5B887", "#8CBFE5", "#D9A1BA", "#B8C990"}
-	if theme == "light" {
-		p = []string{"#087E70", "#7156B2", "#9B601C", "#286D9B", "#A04773", "#5D7524"}
-	}
+	p := paletteFor(theme).series
 	return lipgloss.Color(p[int(h.Sum32())%len(p)])
 }
 func clip(s string, w int) string { return ansi.Truncate(s, max(1, w), "…") }
@@ -573,7 +575,7 @@ func (m model) compactView() string {
 	} else if m.exporting {
 		b.WriteString("EXPORT FILTERED VIEW\n\n1 JSON    2 CSV    3 SVG    4 PNG\n\nesc cancel")
 	} else if m.help {
-		b.WriteString(bright.Render("Make it yours") + "\n\n1–5 / tab   Overview, agents, models, tokens, sessions\nd / w / m   Change grouping instantly\na           Cycle agent filter\nf           Cycle model filter (independent of agent)\nx           Clear filters\nc           Toggle estimated cost / tokens\ns           Sort descending, ascending, or by name\n↑ ↓ / j k   Select row; home/end jump\nenter       Inspect selected row; esc closes\nt           Edit range: two dates, month, or last N\nr           Refresh snapshot (asynchronous)\nq / ctrl+c  Quit\n\nCost estimates use ccusage pricing, never subscription balance.")
+		b.WriteString(bright.Render("Make it yours") + "\n\nT           Cycle theme (" + themeLabel(m.o.Theme) + ")\n1–5 / tab   Overview, agents, models, tokens, sessions\nd / w / m   Change grouping instantly\na           Cycle agent filter\nf           Cycle model filter (independent of agent)\nx           Clear filters\nc           Toggle estimated cost / tokens\ns           Sort descending, ascending, or by name\n↑ ↓ / j k   Select row; home/end jump\nenter       Inspect selected row; esc closes\nt           Edit range: two dates, month, or last N\nr           Refresh snapshot (asynchronous)\nq / ctrl+c  Quit\n\nCost estimates use ccusage pricing, never subscription balance.")
 	} else if m.editing != "" {
 		b.WriteString(bright.Render("Change date range") + "\n\n" + m.input.View() + "\n\n" + muted.Render("YYYY-MM-DD YYYY-MM-DD · * for open bound\nmonth · last N (uses current grouping)\nenter apply · esc cancel"))
 		if m.err != "" {
@@ -677,7 +679,7 @@ func (m model) compactView() string {
 					c = color(r.Name)
 				}
 				if r.Agent == "all" {
-					c = lipgloss.Color("#80D8C3")
+					c = lipgloss.Color(paletteFor(activeTheme).accent)
 				}
 				bar := lipgloss.NewStyle().Foreground(c).Render(strings.Repeat("━", n)) + muted.Render(strings.Repeat("·", barWidth-n))
 				b.WriteString(clip(pointer+name+"  "+bar+fmt.Sprintf("  %15s  %s", m.formatMetric(v, m.cost && m.view != 3), share), w) + "\n")
@@ -688,7 +690,7 @@ func (m model) compactView() string {
 			}
 		}
 	}
-	footer := muted.Render("1–5 views  c metric  s sort  a agent  f model  t range  r refresh  ? help  q quit")
+	footer := muted.Render("T " + themeLabel(m.o.Theme) + "  ? help  q quit  1–5 views  c metric  t range  r refresh")
 	content := b.String()
 	lines := strings.Split(content, "\n")
 	maxLines := m.height - 4

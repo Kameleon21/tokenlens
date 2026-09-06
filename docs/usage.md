@@ -26,7 +26,7 @@ All available agent and model names are discovered dynamically. Agent and model 
 | `n` | Toggle compact k/M/B token labels (inspector remains exact) |
 | `c` / `s` | Cost vs. tokens; descending / ascending / name sorting |
 | `e` | Cycle USD, EUR, GBP, JPY |
-| `T` | Dark, light, terminal ASCII theme |
+| `T` | Cycle theme (active name appears in footer) |
 | `t` | Edit dates: two dates, `month`, or `last N` |
 | `p` | Calendar month → billing cycle → last 30 days → since August 1 |
 | `b` | Toggle configured subscription-plan comparison |
@@ -91,3 +91,28 @@ There is no local log parser, telemetry, background synchronization, or Tokenlen
 ## Exports
 
 Press `o`, then choose JSON, CSV, SVG, or PNG. Files go into `./exports` (or `--export-dir`) and are never overwritten. JSON/CSV contain all filtered rows, underlying USD estimates, display currency/rate metadata, and the selected range. SVG/PNG are standalone ranked charts of up to 30 rows. Image charts are not full-terminal screenshots. CSV labels are escaped to remain text in spreadsheets. Exported usage can contain private names; the default export directory is gitignored.
+
+### Themes
+
+Press `Shift+T` inside the dashboard to cycle through Dark, Light, ASCII, Nord,
+Gruvbox, Tokyo Night Light, Dracula, Catppuccin Mocha, and Solarized Light.
+The palette changes immediately, including charts, highlights, and backgrounds.
+The selection lasts for the current run. Choose a startup theme with `--theme`:
+
+```sh
+tokenlens --theme nord
+tokenlens --theme gruvbox
+tokenlens --theme tokyo-light
+tokenlens --theme dracula
+tokenlens --theme catppuccin
+tokenlens --theme solarized-light
+```
+
+Existing `dark` (default), `light`, and `ascii` values remain available.
+Palettes are adapted for terminal dashboards from [Nord](https://www.nordtheme.com/docs/colors-and-palettes),
+[Gruvbox](https://github.com/morhetz/gruvbox), [Tokyo Night](https://github.com/folke/tokyonight.nvim),
+[Dracula](https://draculatheme.com/contribute), [Catppuccin](https://catppuccin.com/palette/),
+and [Solarized](https://ethanschoonover.com/solarized/).
+
+![Nord dashboard with synthetic demo data](assets/theme-nord.png)
+![Dracula dashboard with synthetic demo data](assets/theme-dracula.png)

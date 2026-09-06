@@ -10,23 +10,49 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+// Keep CLI validation, keyboard cycling, and palettes in the same order.
+var themeNames = []string{"dark", "light", "ascii", "nord", "gruvbox", "tokyo-light", "dracula", "catppuccin", "solarized-light"}
+
+type themePalette struct {
+	label, background, foreground, muted, accent, border, surface string
+	series                                                        [6]string
+}
+
+var themePalettes = map[string]themePalette{
+	"dark":            {"Dark", "#151D28", "#E3E9F3", "#8794A9", "#80D8C3", "#394555", "#19212C", [6]string{"#80D8C3", "#AFABED", "#E5B887", "#8CBFE5", "#D9A1BA", "#B8C990"}},
+	"light":           {"Light", "#F4F7FA", "#162638", "#526276", "#087E70", "#A6B6C8", "#E3EBF2", [6]string{"#087E70", "#7156B2", "#9B601C", "#286D9B", "#A04773", "#5D7524"}},
+	"nord":            {"Nord", "#2E3440", "#ECEFF4", "#D8DEE9", "#88C0D0", "#4C566A", "#3B4252", [6]string{"#88C0D0", "#B48EAD", "#EBCB8B", "#81A1C1", "#D08770", "#A3BE8C"}},
+	"gruvbox":         {"Gruvbox", "#282828", "#EBDBB2", "#A89984", "#8EC07C", "#665C54", "#3C3836", [6]string{"#8EC07C", "#D3869B", "#FABD2F", "#83A598", "#FE8019", "#B8BB26"}},
+	"tokyo-light":     {"Tokyo Night Light", "#E1E2E7", "#3760BF", "#6172B0", "#007197", "#A8AECb", "#D0D5E3", [6]string{"#007197", "#7847BD", "#8C6C3E", "#2E7DE9", "#B15C00", "#587539"}},
+	"dracula":         {"Dracula", "#282A36", "#F8F8F2", "#BDBDCB", "#BD93F9", "#6272A4", "#44475A", [6]string{"#8BE9FD", "#BD93F9", "#F1FA8C", "#FF79C6", "#FFB86C", "#50FA7B"}},
+	"catppuccin":      {"Catppuccin Mocha", "#1E1E2E", "#CDD6F4", "#A6ADC8", "#CBA6F7", "#585B70", "#313244", [6]string{"#94E2D5", "#CBA6F7", "#F9E2AF", "#89B4FA", "#F5C2E7", "#A6E3A1"}},
+	"solarized-light": {"Solarized Light", "#FDF6E3", "#586E75", "#657B83", "#007F78", "#93A1A1", "#EEE8D5", [6]string{"#007F78", "#6C71C4", "#9A7000", "#268BD2", "#D33682", "#738000"}},
+}
+
 var activeTheme = "dark"
+
+func paletteFor(name string) themePalette {
+	if p, ok := themePalettes[name]; ok {
+		return p
+	}
+	return themePalettes["dark"]
+}
+
+func themeLabel(name string) string {
+	if name == "ascii" {
+		return "ASCII"
+	}
+	return paletteFor(name).label
+}
 
 func applyTheme(name string) {
 	activeTheme = name
-	if name == "light" {
-		ink = lipgloss.Color("#162638")
-		muted = lipgloss.NewStyle().Foreground(lipgloss.Color("#526276"))
-		accent = lipgloss.NewStyle().Foreground(lipgloss.Color("#087E70"))
-		borderColor = lipgloss.Color("#A6B6C8")
-		surface = lipgloss.Color("#E3EBF2")
-	} else {
-		ink = lipgloss.Color("#E3E9F3")
-		muted = lipgloss.NewStyle().Foreground(lipgloss.Color("#8794A9"))
-		accent = lipgloss.NewStyle().Foreground(lipgloss.Color("#80D8C3"))
-		borderColor = lipgloss.Color("#394555")
-		surface = lipgloss.Color("#19212C")
-	}
+	p := paletteFor(name)
+	ink = lipgloss.Color(p.foreground)
+	muted = lipgloss.NewStyle().Foreground(lipgloss.Color(p.muted))
+	accent = lipgloss.NewStyle().Foreground(lipgloss.Color(p.accent))
+	borderColor = lipgloss.Color(p.border)
+	surface = lipgloss.Color(p.surface)
 	bright = lipgloss.NewStyle().Foreground(ink).Bold(true)
 }
 func themeRender(s, theme string, w, h int) string {
@@ -36,10 +62,8 @@ func themeRender(s, theme string, w, h int) string {
 	if theme == "ascii" {
 		return fit(ansi.Strip(s), w, h)
 	}
-	style := lipgloss.NewStyle().Foreground(ink).Background(lipgloss.Color("#151D28"))
-	if theme == "light" {
-		style = style.Background(lipgloss.Color("#F4F7FA"))
-	}
+	p := paletteFor(theme)
+	style := lipgloss.NewStyle().Foreground(lipgloss.Color(p.foreground)).Background(lipgloss.Color(p.background))
 	out := style.Render(fit(s, w, h))
 	if theme != "ascii" {
 		sample := style.Render("x")
