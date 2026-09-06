@@ -36,6 +36,10 @@ type exchangeMsg struct {
 	id       int
 }
 type model struct {
+	choosingTheme                         bool
+	themeOriginal                         string
+	themeCursor                           int
+	themeQuery                            textinput.Model
 	reports                               map[datefilter.Range]Snapshot
 	fxRequest                             int
 	compactNumbers                        bool
@@ -140,6 +144,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.refresh(m.o.Range)
 		}
 	case tea.MouseMsg:
+		if m.choosingTheme {
+			return m, nil
+		}
 		if m.view == 0 && !m.activityDetail && !m.details && m.width >= 96 && m.height >= 32 && m.layout == 0 && v.Y >= 19 && v.Y < 16+(m.height-20)/2-1 && v.X >= 5 && v.X < (m.width-4)/2 {
 			rows := m.chartPeriods()
 			count := max(1, ((m.width-6)/2-6)/3)
@@ -210,6 +217,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.fxCancel()
 			}
 			return m, tea.Quit
+		}
+		if m.choosingTheme {
+			return m.updateThemePicker(v)
 		}
 		if m.exporting {
 			if key == "esc" || key == "q" {
@@ -288,6 +298,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.help = !m.help
 			return m, nil
 		}
+		if key == "ctrl+t" || key == "T" {
+			cmd := m.openThemePicker()
+			return m, cmd
+		}
 		if m.help {
 			return m, nil
 		}
@@ -337,10 +351,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "e":
 			m.o.Currency = cycle([]string{"USD", "EUR", "GBP", "JPY"}, m.o.Currency)
 			return m, m.refreshExchange()
-		case "T":
-			m.o.Theme = cycle(themeNames, m.o.Theme)
-			applyTheme(m.o.Theme)
-			m.spin.Style = accent
 		case "p":
 			m.preset = (m.preset + 1) % 4
 			m.notice = []string{"This calendar month", "This billing cycle", "Last 30 days", "Since August 1"}[m.preset]
@@ -416,8 +426,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	var cmd tea.Cmd
+	if m.choosingTheme {
+		m.themeQuery, cmd = m.themeQuery.Update(msg)
+	}
 	if m.loading {
-		m.spin, cmd = m.spin.Update(msg)
+		var spinCmd tea.Cmd
+		m.spin, spinCmd = m.spin.Update(msg)
+		cmd = tea.Batch(cmd, spinCmd)
 	}
 	return m, cmd
 }
@@ -575,7 +590,7 @@ func (m model) compactView() string {
 	} else if m.exporting {
 		b.WriteString("EXPORT FILTERED VIEW\n\n1 JSON    2 CSV    3 SVG    4 PNG\n\nesc cancel")
 	} else if m.help {
-		b.WriteString(bright.Render("Make it yours") + "\n\nT           Cycle theme (" + themeLabel(m.o.Theme) + ")\n1–5 / tab   Overview, agents, models, tokens, sessions\nd / w / m   Change grouping instantly\na           Cycle agent filter\nf           Cycle model filter (independent of agent)\nx           Clear filters\nc           Toggle estimated cost / tokens\ns           Sort descending, ascending, or by name\n↑ ↓ / j k   Select row; home/end jump\nenter       Inspect selected row; esc closes\nt           Edit range: two dates, month, or last N\nr           Refresh snapshot (asynchronous)\nq / ctrl+c  Quit\n\nCost estimates use ccusage pricing, never subscription balance.")
+		b.WriteString(bright.Render("Make it yours") + "\n\nCtrl+T      Choose theme (" + themeLabel(m.o.Theme) + ")\n1–5 / tab   Overview, agents, models, tokens, sessions\nd / w / m   Change grouping instantly\na           Cycle agent filter\nf           Cycle model filter (independent of agent)\nx           Clear filters\nc           Toggle estimated cost / tokens\ns           Sort descending, ascending, or by name\n↑ ↓ / j k   Select row; home/end jump\nenter       Inspect selected row; esc closes\nt           Edit range: two dates, month, or last N\nr           Refresh snapshot (asynchronous)\nq / ctrl+c  Quit\n\nCost estimates use ccusage pricing, never subscription balance.")
 	} else if m.editing != "" {
 		b.WriteString(bright.Render("Change date range") + "\n\n" + m.input.View() + "\n\n" + muted.Render("YYYY-MM-DD YYYY-MM-DD · * for open bound\nmonth · last N (uses current grouping)\nenter apply · esc cancel"))
 		if m.err != "" {
@@ -690,7 +705,7 @@ func (m model) compactView() string {
 			}
 		}
 	}
-	footer := muted.Render("Shift+T theme  ? help  q quit  1–5 views  c metric  t range  r refresh")
+	footer := muted.Render("Ctrl+T themes  ? help  q quit  1–5 views  c metric  t range  r refresh")
 	content := b.String()
 	lines := strings.Split(content, "\n")
 	maxLines := m.height - 4

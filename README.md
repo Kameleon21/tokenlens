@@ -11,9 +11,9 @@
 
 See your coding-agent token usage and estimated costs in your terminal. Compare agents and models, explore dates, and export reports.
 
-![Tokenlens demo](docs/assets/demo.gif)
+![Tokenlens dashboard, model comparisons, and searchable theme picker](docs/assets/demo.gif)
 
-*The demo uses made-up data.*
+*The demo uses made-up data. [Watch the MP4](docs/assets/demo.mp4).*
 
 ## Install and run
 
@@ -42,7 +42,7 @@ tokenlens --demo
 tokenlens --currency EUR
 tokenlens weekly --last 8
 tokenlens --since 2026-08-01 --until 2026-08-31
-tokenlens --theme nord  # Shift+T cycles themes inside the app
+tokenlens --theme nord  # Ctrl+T opens the theme picker
 ```
 
 The default date range is this calendar month. Dates are inclusive. Tokenlens uses your system timezone by default. `TZ` overrides it, and `--timezone` takes priority over both.
@@ -57,6 +57,7 @@ Set `TOKENLENS_CURRENCY=EUR` in your shell to keep euros as your default.
 | `c` / `e` | Switch cost/token view / currency |
 | `r` | Fetch a fresh report |
 | `o` | Export JSON, CSV, SVG, or PNG |
+| `Ctrl+T` | Search and preview themes |
 | `?` / `q` | All controls / quit |
 
 ## Loading speed
