@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 )
@@ -22,7 +23,8 @@ func TestSnapshotCache(t *testing.T) {
 	}
 	path, _ := snapshotCachePath(o, o.Range)
 	info, _ := os.Stat(path)
-	if info.Mode().Perm() != 0600 {
+	// Windows uses inherited ACLs; Go does not expose Unix 0600 mode bits there.
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0600 {
 		t.Fatal("cache not private")
 	}
 	other := o
