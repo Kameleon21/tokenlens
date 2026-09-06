@@ -1,0 +1,26 @@
+name: Feature proposal
+description: Discuss a change before investing in implementation.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: Proposals are welcome, but acceptance and delivery dates are not guaranteed. Search existing proposals first.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe a concrete use case without sharing private usage data.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Include scope, compatibility, and privacy considerations where relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing options or simpler solutions, if any.

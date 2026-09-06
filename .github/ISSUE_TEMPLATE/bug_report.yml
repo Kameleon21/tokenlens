@@ -1,0 +1,43 @@
+name: Bug report
+description: Report a reproducible problem with Tokenlens.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search existing issues first. Do not include personal logs, exports, credentials, or private project names.
+        Report security vulnerabilities privately: https://github.com/Kameleon21/tokenlens/security/advisories/new
+  - type: input
+    id: version
+    attributes:
+      label: Tokenlens version
+      description: Output of tokenlens --version; include installation method.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, architecture, terminal, and backend version if relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Include commands and a minimal synthetic example; say whether demo mode reproduces it.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include redacted errors or synthetic screenshots if helpful.
+    validations:
+      required: true

@@ -108,6 +108,9 @@ See the [usage reference](docs/usage.md) for billing comparisons, exports, cache
 ## Contributing
 
 Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks, and pull request guidelines. Small fixes and documentation improvements are welcome.
+See the [code of conduct](CODE_OF_CONDUCT.md), [support expectations](SUPPORT.md),
+and [governance](GOVERNANCE.md). Report vulnerabilities privately using the
+[security policy](SECURITY.md).
 
 ## License
 
