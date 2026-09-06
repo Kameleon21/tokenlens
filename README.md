@@ -94,14 +94,14 @@ Recent reports are reused for **five minutes**, so reopening Tokenlens or return
 - Currency, grouping, and filter changes do not rerun the usage report.
 - Use `--cache-ttl 30s` for a shorter reuse window, or `--cache-ttl 0` to always reload.
 - Model prices come from a bundled or downloaded LiteLLM catalog. Older prices refresh in the background, without delaying the first report. The price date and incomplete coverage are shown.
-- Use `--offline` to disable background price downloads. Currency conversion still needs an exchange-rate request.
-- `--no-cache` disables report and price-cache reads/writes. Saved reports live in your OS user cache under `tokenlens`; `--cache-dir` changes that location.
+- Use `--offline` to disable background price downloads. Currency conversion fetches a rate only when its 24-hour cache needs refreshing.
+- `--no-cache` disables report caching and disk price/exchange-rate caching. Saved reports live in your OS user cache under `tokenlens`; `--cache-dir` changes that location.
 
 First loads and dates without a saved report still scan logs through ccusage. See the [performance plan](docs/performance.md) for how Tokenlens could eventually read usage logs itself.
 
 ## What the numbers mean
 
-Costs are estimates from ccusage, not your subscription bill. Currency conversion uses the latest published ECB reference rate via Frankfurter, including for historical usage. Missing values are shown as unavailable.
+Costs are estimates from ccusage, not your subscription bill. Currency conversion uses an ECB reference rate via Frankfurter, including for historical usage. The last successful rate loads immediately and is reused for 24 hours; `r` refreshes usage but keeps a rate younger than 24 hours. Failed rate requests preserve the previous rate and its date. Missing values are shown as unavailable.
 
 Usage reports stay local. Background pricing downloads fetch the public LiteLLM catalog; no usage logs are sent. Non-USD conversion sends only the currency request. Cached reports and exports can contain private project or session names. Demo mode uses synthetic data and makes no backend or exchange-rate requests.
 

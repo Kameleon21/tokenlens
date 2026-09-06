@@ -56,6 +56,9 @@ func (m model) exportCmd(kind string) tea.Cmd {
 	return func() tea.Msg { path, e := m.writeExport(kind); return exportedMsg{path, e} }
 }
 func (m model) writeExport(kind string) (string, error) {
+	if !m.fx.available() {
+		return "", fmt.Errorf("%s exchange rate unavailable; retry after the rate loads", m.fx.Currency)
+	}
 	rows := m.exportRows()
 	var data []byte
 	var e error

@@ -33,7 +33,7 @@ All available agent and model names are discovered dynamically. Agent and model 
 | `p` | Calendar month → billing cycle → last 30 days → since August 1 |
 | `b` | Toggle configured subscription-plan comparison |
 | `o`, then `1`–`4` | Export JSON / CSV / SVG / PNG |
-| `r` | Refresh usage and exchange rate |
+| `r` | Refresh usage; refresh exchange rate only after 24 hours |
 | `h` | Explain unavailable hourly / 5-hour data |
 | `?`, `esc` | Help; close editor, details, or error |
 | `q` / `ctrl+c` | Quit |
@@ -110,21 +110,23 @@ The billing preset uses `--billing-day` (default 1), clamped for shorter months,
 
 ## Currency
 
-Non-USD displays fetch the latest published **ECB reference rate via [Frankfurter](https://frankfurter.dev/)** asynchronously. The rate, date, and source stay visible. Only the currency pair is sent; usage data remains local.
+Non-USD displays load the last successful **ECB reference rate via [Frankfurter](https://frankfurter.dev/)** from disk before the first frame. Rates are cached separately per currency for 24 hours from the last successful fetch, independently of the source reference date. Startup, currency changes, and `r` reuse a fresh rate; an absent or expired rate triggers an asynchronous request. The rate, date, and source stay visible. Only the currency pair is sent; usage data remains local.
 
-These are daily reference rates, **not real-time market quotes**. A single latest rate converts all displayed costs, including historical reports. It is not a historical transaction conversion or a bank's exchange rate. Weekends/holidays can produce an earlier source date. Unsupported currencies or a failed first request leave amounts explicitly labeled USD. A failed later refresh keeps the previous rate with its date and a warning. Demo mode uses a clearly labeled synthetic rate of 0.9 for non-USD currencies and makes no rate request.
+These are daily reference rates, **not real-time market quotes**. A single latest rate converts all displayed costs, including historical reports. It is not a historical transaction conversion or a bank's exchange rate. Weekends/holidays can produce an earlier source date. Without a saved rate, the configured currency stays selected while costs are unavailable and the exchange-rate status shows loading. Unsupported currencies or a failed first request keep costs unavailable rather than showing USD or zero-valued conversions. Exports and plan comparisons wait for a valid rate. A failed later refresh keeps the previous rate with its date and a warning. Demo mode uses a clearly labeled synthetic rate of 0.9 for non-USD currencies and makes no rate request.
 
 All internal costs remain USD. Currency switching changes presentation, not token counts or percentages.
 
 ## Startup and caching
 
-There are two independent caches:
+Caching is split by data source:
 
 1. **Backend package cache**: only Go/source installations that fall back to Bun need a first ccusage download. Release archives include the backend in `libexec`.
 2. **Tokenlens snapshots**: reports are cached for each range, timezone, backend, application version, and price revision. Fresh snapshots (five minutes by default) skip ccusage; older matching snapshots remain visible during refresh. Up to 16 ranges are held in memory. Snapshots older than seven days are not reused.
 3. **Model prices**: Tokenlens includes a dated LiteLLM catalog, prefers a newer valid downloaded copy, and checks for updates in the background after six hours. Press `r` to request new usage and a price update; price downloads have a one-minute retry cooldown and an eight-second timeout. Changed prices trigger another report after any current load finishes.
 
-`--cache-dir` selects the report/price cache directory. `--no-cache` disables disk price caching and all usage snapshot caching. It does not prohibit network requests. `--offline` prohibits background price downloads; it still uses the newest available local catalog. Currency conversion has its own request and is not disabled by this flag. Demo mode does not read or write these caches or download prices.
+Exchange rates use their own per-currency disk files and are reused for 24 hours. Expired successful rates remain available during refresh and after a failed request.
+
+`--cache-dir` selects the report/price/exchange-rate cache directory. `--no-cache` disables disk price/exchange-rate caching and all usage snapshot caching. A successful exchange rate is still reused for 24 hours within the running session. It does not prohibit network requests. `--offline` prohibits background price downloads; it still uses the newest available local catalog. Currency conversion has its own request and is not disabled by this flag. Demo mode does not read or write these caches or download prices.
 
 Price dates are independent from report timestamps. Missing exact model prices or rates for a used token category make that model's cost unavailable, and aggregate costs become partial. A zero is only treated as a free rate when it is explicitly present in the catalog. Model aliases without exact catalog coverage can therefore appear unpriced even when ccusage could guess a match. JSON exports include the price source, date, and unpriced models.
 

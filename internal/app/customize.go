@@ -119,6 +119,9 @@ func (m model) planSummary() string {
 	if m.fx.Currency != m.o.PlanCurrency {
 		return "Plan configured in " + m.o.PlanCurrency + "\nSelect that currency to compare."
 	}
+	if !m.fx.available() {
+		return "Exchange rate unavailable; plan comparison pending"
+	}
 	agent := m.o.PlanAgent
 	if agent == "" {
 		agent = m.agent

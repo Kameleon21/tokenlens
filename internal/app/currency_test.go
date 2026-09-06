@@ -103,16 +103,17 @@ func TestExchangeCancellation(t *testing.T) {
 func TestExchangeFallbackAndStaleResult(t *testing.T) {
 	m := fixtureModel()
 	m.o.Currency = "EUR"
+	m.fx = Exchange{Currency: "EUR"}
 	m.fxRequest = 2
 	m.fxLoading = true
 	v, _ := m.Update(exchangeMsg{exchange: Exchange{Currency: "EUR", Rate: 0.86}, id: 1})
 	m = v.(model)
-	if m.fx.Currency != "USD" || !m.fxLoading {
+	if m.fx.Currency != "EUR" || m.fx.available() || !m.fxLoading {
 		t.Fatal("stale rate applied")
 	}
 	v, _ = m.Update(exchangeMsg{err: errors.New("offline"), id: 2})
 	m = v.(model)
-	if m.fx.Currency != "USD" || !strings.Contains(m.exchangeStatus(), "showing USD") {
+	if m.fx.Currency != "EUR" || m.fx.available() || !strings.Contains(m.exchangeStatus(), "costs unavailable") {
 		t.Fatal("dishonest fallback")
 	}
 	v, _ = m.Update(exchangeMsg{exchange: Exchange{Currency: "EUR", Rate: 0.86, Date: "2026-09-04", Source: "ECB via Frankfurter"}, id: 2})
