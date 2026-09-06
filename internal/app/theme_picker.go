@@ -69,6 +69,7 @@ func (m model) updateThemePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.previewTheme(matches[m.themeCursor])
+		m.savePreference(func(p *Preferences) { p.Theme = m.o.Theme })
 		m.choosingTheme = false
 		m.themeQuery.Blur()
 		return m, nil

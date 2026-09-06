@@ -136,3 +136,52 @@ and [Solarized](https://ethanschoonover.com/solarized/).
 
 ![Searchable theme picker with synthetic data](assets/theme-picker.png)
 ![Theme picker in a compact terminal](assets/theme-picker-compact.png)
+
+## Saved preferences
+
+Tokenlens remembers choices you apply inside the TUI: currency (`e`), theme
+(Ctrl+T then Enter), grouping (`d`/`w`/`m`), cost/token display (`c`), compact
+numbers (`n`), and overview layout (`v`). Theme previews and Escape do not save.
+These preferences also apply to demo mode. Dates, filters, searches, and the
+current view remain session-only.
+
+On **macOS and Linux**, preferences live in
+`~/.config/tokenlens/config.toml`. An absolute `$XDG_CONFIG_HOME` overrides
+`~/.config`; a relative value is ignored. On **Windows**, the file lives at
+`%AppData%\tokenlens\config.toml`.
+
+```sh
+tokenlens config path   # print the exact location; does not create a file
+tokenlens config reset  # remove saved preferences; leave usage caches intact
+```
+
+The file is created on the first TUI preference change, not simply on startup.
+You can also create or edit it yourself:
+
+```toml
+currency = "EUR"
+theme = "tokyo-dark"
+grouping = "daily"
+display = "cost"
+compact_numbers = false
+layout = "dashboard"
+```
+
+Missing fields use defaults. Grouping accepts `daily`, `weekly`, or `monthly`;
+display accepts `cost` or `tokens`; layout accepts `dashboard` or `stacked`.
+Use the theme identifiers shown by `tokenlens --help`.
+
+An explicit CLI option takes precedence over an environment variable, then the
+saved preference, then the default. For example, `--currency USD` overrides
+`TOKENLENS_CURRENCY=GBP`, which overrides a saved EUR preference. Positional
+`daily`, `weekly`, or `monthly` overrides saved grouping. One-off CLI or
+environment overrides never update the file. Changing a preference inside the
+TUI saves only that choice, so changing layout won't save an unrelated CLI
+currency override. Timezone continues to follow the system, `TZ`, or `--timezone`.
+
+The file is rewritten as TOML when saving, so formatting and comments are not
+preserved. Invalid values or unknown keys produce an error with the file path;
+edit the file or use `tokenlens config reset` to recover. `--help`, `--version`,
+and config commands remain available even with invalid preferences. A failed
+save shows a notice and leaves the current TUI choice usable for that session.
+Reset affects future launches; an already open TUI can save new choices again.

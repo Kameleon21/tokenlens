@@ -83,7 +83,11 @@ func newModel(ctx context.Context, o Options) model {
 	ti := textinput.New()
 	ti.CharLimit = 200
 	ti.Width = 55
-	return model{ctx: ctx, o: o, width: 100, height: 32, cost: true, spin: sp, input: ti, fx: usdExchange()}
+	layout := 0
+	if o.preferences.Layout == "stacked" {
+		layout = 1
+	}
+	return model{ctx: ctx, o: o, width: 100, height: 32, cost: o.preferences.Display != "tokens", compactNumbers: o.preferences.CompactNumbers, layout: layout, spin: sp, input: ti, fx: usdExchange()}
 }
 func (m model) Init() tea.Cmd { return func() tea.Msg { return "initial-load" } }
 func (m *model) refresh(r datefilter.Range, force ...bool) tea.Cmd {
@@ -322,15 +326,24 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.details = false
 		case "d":
 			m.o.Group = "daily"
+			m.savePreference(func(p *Preferences) { p.Grouping = m.o.Group })
 			m.cursor = 0
 		case "w":
 			m.o.Group = "weekly"
+			m.savePreference(func(p *Preferences) { p.Grouping = m.o.Group })
 			m.cursor = 0
 		case "m":
 			m.o.Group = "monthly"
+			m.savePreference(func(p *Preferences) { p.Grouping = m.o.Group })
 			m.cursor = 0
 		case "c":
 			m.cost = !m.cost
+			m.savePreference(func(p *Preferences) {
+				p.Display = "tokens"
+				if m.cost {
+					p.Display = "cost"
+				}
+			})
 		case "s":
 			m.sortMode = (m.sortMode + 1) % 3
 			m.cursor = 0
@@ -348,8 +361,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cursor = max(0, len(m.rows())-1)
 		case "n":
 			m.compactNumbers = !m.compactNumbers
+			m.savePreference(func(p *Preferences) { p.CompactNumbers = m.compactNumbers })
 		case "e":
 			m.o.Currency = cycle([]string{"USD", "EUR", "GBP", "JPY"}, m.o.Currency)
+			m.savePreference(func(p *Preferences) { p.Currency = m.o.Currency })
 			return m, m.refreshExchange()
 		case "p":
 			m.preset = (m.preset + 1) % 4
@@ -371,6 +386,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.widget = (m.widget + 1) % 4
 		case "v":
 			m.layout = (m.layout + 1) % 2
+			m.savePreference(func(p *Preferences) {
+				p.Layout = "dashboard"
+				if m.layout == 1 {
+					p.Layout = "stacked"
+				}
+			})
 		case "enter":
 			if m.view == 0 && !m.activityDetail && m.width >= 96 && m.height >= 32 {
 				selectedPeriod := ""

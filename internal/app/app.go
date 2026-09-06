@@ -15,6 +15,8 @@ import (
 )
 
 type Options struct {
+	preferences                               Preferences
+	configPath                                string
 	ShowVersion                               bool
 	CacheTTL                                  time.Duration
 	Offline                                   bool
@@ -35,6 +37,7 @@ func options(args []string, now time.Time) (Options, error) {
 
 func optionsWithLocalTimezone(args []string, now time.Time, detect func() (string, error)) (Options, error) {
 	o := Options{Group: "daily", Bin: "ccusage", Currency: "USD"}
+	explicitGroup := false
 	if c := os.Getenv("TOKENLENS_CURRENCY"); c != "" {
 		o.Currency = c
 	}
@@ -42,6 +45,7 @@ func optionsWithLocalTimezone(args []string, now time.Time, detect func() (strin
 		o.TZ = tz
 	}
 	if len(args) > 0 && (args[0] == "daily" || args[0] == "weekly" || args[0] == "monthly") {
+		explicitGroup = true
 		o.Group = args[0]
 		args = args[1:]
 	}
@@ -63,10 +67,10 @@ func optionsWithLocalTimezone(args []string, now time.Time, detect func() (strin
 	f.Float64Var(&o.PlanCost, "plan-cost", 0, "configured monthly plan price in startup display currency")
 	f.StringVar(&o.PlanAgent, "plan-agent", "", "agent covered by your plan, e.g. claude")
 	f.IntVar(&o.BillingDay, "billing-day", 1, "monthly billing start day (1–31, clamped in shorter months)")
-	f.StringVar(&o.Currency, "currency", o.Currency, "display currency (e.g. EUR); default TOKENLENS_CURRENCY or USD; fetches ECB reference rate")
+	f.StringVar(&o.Currency, "currency", o.Currency, "display currency (e.g. EUR); default TOKENLENS_CURRENCY, saved preference, or USD; fetches ECB reference rate")
 	f.BoolVar(&o.Demo, "demo", false, "clearly labeled synthetic demo; no backend needed")
 	f.Usage = func() {
-		fmt.Fprint(f.Output(), "Tokenlens — a local lens on agent usage\n\nUsage: tokenlens [daily|weekly|monthly] [flags]\n\nNo range flags: current calendar month. Costs originate in USD; --currency converts display amounts.\n")
+		fmt.Fprint(f.Output(), "Tokenlens — a local lens on agent usage\n\nUsage: tokenlens [daily|weekly|monthly] [flags]\n       tokenlens config path|reset\n\nNo range flags: current calendar month. Costs originate in USD; --currency converts display amounts.\n")
 		f.PrintDefaults()
 	}
 	if e := f.Parse(args); e != nil {
@@ -77,6 +81,26 @@ func optionsWithLocalTimezone(args []string, now time.Time, detect func() (strin
 	}
 	if o.ShowVersion {
 		return o, nil
+	}
+	path, err := configPath()
+	if err != nil {
+		return o, err
+	}
+	prefs, err := readPreferences(path)
+	if err != nil {
+		return o, err
+	}
+	o.preferences, o.configPath = prefs, path
+	provided := map[string]bool{}
+	f.Visit(func(v *flag.Flag) { provided[v.Name] = true })
+	if !provided["currency"] && os.Getenv("TOKENLENS_CURRENCY") == "" {
+		o.Currency = prefs.Currency
+	}
+	if !provided["theme"] {
+		o.Theme = prefs.Theme
+	}
+	if !explicitGroup {
+		o.Group = prefs.Grouping
 	}
 	hasLast := false
 	f.Visit(func(v *flag.Flag) {
@@ -124,6 +148,13 @@ func optionsWithLocalTimezone(args []string, now time.Time, detect func() (strin
 
 // Run starts the terminal app and returns a process exit code.
 func Run(args []string) int {
+	if len(args) > 0 && args[0] == "config" {
+		if err := configCommand(args[1:], os.Stdout); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return 2
+		}
+		return 0
+	}
 	o, e := options(args, time.Now())
 	if errors.Is(e, flag.ErrHelp) {
 		return 0
