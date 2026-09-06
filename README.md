@@ -6,9 +6,9 @@
 
 See your coding-agent token usage and estimated costs in your terminal. Compare agents and models, explore dates, and export reports.
 
-![Tokenlens demo](docs/assets/demo.gif)
+![Tokenlens dashboard, model comparisons, and searchable theme picker](docs/assets/demo.gif)
 
-*The demo uses made-up data.*
+*The demo uses made-up data. [Watch the MP4](docs/assets/demo.mp4).*
 
 ## Install and run
 
