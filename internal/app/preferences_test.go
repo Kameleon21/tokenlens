@@ -22,6 +22,9 @@ func TestMain(m *testing.M) {
 	}
 	os.Setenv("XDG_CONFIG_HOME", dir)
 	os.Setenv("APPDATA", dir)
+	// Ordinary tests must not depend on the host's timezone or runtime startup speed.
+	// Timezone tests explicitly clear/override TZ and inject their detector.
+	os.Setenv("TZ", "UTC")
 	code := m.Run()
 	os.RemoveAll(dir)
 	os.Exit(code)
