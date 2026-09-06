@@ -16,7 +16,12 @@ See your coding-agent token usage and estimated costs in your terminal. Compare 
 
 ## Install and run
 
-You need **Go 1.25+** and either [Bun](https://bun.sh) or **ccusage 20.0.20**.
+Download a prebuilt archive for your OS and architecture from
+[GitHub Releases](https://github.com/Kameleon21/tokenlens/releases), verify its
+SHA-256 checksum, and extract the binary into a directory on your `PATH`.
+
+Real usage needs either [Bun](https://bun.sh) or **ccusage 20.0.20**.
+Alternatively, install from source with **Go 1.25+**:
 
 ```sh
 go install github.com/Kameleon21/tokenlens@latest

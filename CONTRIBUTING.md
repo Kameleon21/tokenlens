@@ -4,14 +4,11 @@ Small fixes can go straight to a pull request. Open an issue before a large feat
 
 ## Setup and checks
 
-Install Go 1.25 or newer. Clone the repository and run:
+Install Go 1.25 or newer, Python 3, and Make. Clone the repository and run:
 
 ```sh
 go run . --demo
-go test ./...
-go test -race ./...
-go vet ./...
-go build -o bin/tokenlens .
+make check
 ```
 
 Run `gofmt` on Go files you change. Normal tests use synthetic fixtures and local HTTP test servers; they must not require personal logs, credentials, Bun, or an external service. Live integration tests are opt-in.
@@ -56,4 +53,4 @@ Use semantic versions starting at `0.1.0`. For every user-visible change, add a
 concise entry under **Unreleased** in [CHANGELOG.md](CHANGELOG.md). Release PRs
 update `Version` in `internal/app/version.go` and move those entries into a
 versioned changelog section. Follow [docs/releases.md](docs/releases.md) for bump
-rules, required checks, tagging, and publishing with `gh`.
+rules, `make release-prepare`, required checks, and tag-triggered publishing with GoReleaser.

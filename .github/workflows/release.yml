@@ -1,0 +1,50 @@
+name: Release
+on:
+  push:
+    tags: ["v*"]
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Validate tag and release metadata
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python3 scripts/release.py check --tag "$RELEASE_TAG"
+          git merge-base --is-ancestor HEAD origin/main
+      - run: make check
+  publish:
+    needs: validate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Prepare release notes and tool version
+        id: goreleaser
+        run: |
+          python3 scripts/release.py notes > "$RUNNER_TEMP/release-notes.md"
+          echo "version=$(cat .goreleaser-version)" >> "$GITHUB_OUTPUT"
+      - name: Build archives, checksums, and publish the GitHub release
+        uses: goreleaser/goreleaser-action@v7
+        with:
+          version: ${{ steps.goreleaser.outputs.version }}
+          args: release --clean --release-notes=${{ runner.temp }}/release-notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
