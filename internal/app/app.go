@@ -67,7 +67,7 @@ func optionsWithPreferenceReader(args []string, now time.Time, detect func() (st
 	f.StringVar(&o.CacheDir, "cache-dir", "", "snapshot cache directory (default OS user cache / tokenlens)")
 	f.BoolVar(&o.Offline, "offline", false, "disable background price downloads (use local prices)")
 	f.DurationVar(&o.CacheTTL, "cache-ttl", 5*time.Minute, "reuse recent reports for this long; 0 always reloads; r forces refresh")
-	f.BoolVar(&o.NoCache, "no-cache", false, "disable memory and on-disk usage snapshots")
+	f.BoolVar(&o.NoCache, "no-cache", false, "disable usage snapshots and disk price/exchange-rate caches")
 	f.StringVar(&o.Theme, "theme", "dark", strings.Join(themeNames, ", "))
 	f.StringVar(&o.ExportDir, "export-dir", "exports", "directory for filtered CSV/JSON/SVG/PNG exports")
 	f.Float64Var(&o.PlanCost, "plan-cost", 0, "configured monthly plan price in startup display currency")

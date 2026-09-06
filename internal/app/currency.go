@@ -18,6 +18,7 @@ type Exchange struct {
 	Currency     string
 	Rate         float64
 	Date, Source string
+	FetchedAt    time.Time
 }
 
 func usdExchange() Exchange { return Exchange{Currency: "USD", Rate: 1} }
@@ -63,10 +64,10 @@ func fetchExchange(ctx context.Context, client *http.Client, endpoint, currency 
 	if _, e = time.Parse("2006-01-02", data.Date); e != nil {
 		return Exchange{}, fmt.Errorf("invalid exchange-rate date")
 	}
-	return Exchange{Currency: currency, Rate: data.Rate, Date: data.Date, Source: "ECB via Frankfurter"}, nil
+	return Exchange{Currency: currency, Rate: data.Rate, Date: data.Date, Source: "ECB via Frankfurter", FetchedAt: time.Now()}, nil
 }
 func (x Exchange) format(v Metric) string {
-	if !v.Known {
+	if !v.Known || !x.available() {
 		return "unavailable"
 	}
 	amount := v.Value * x.Rate

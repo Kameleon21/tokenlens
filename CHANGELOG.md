@@ -5,6 +5,10 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+### Fixed
+
+- Keep the configured currency visible at startup by loading the last successful exchange rate immediately. Reuse rates for 24 hours, including on manual refresh; retain dated rates when a refresh fails, and show unavailable costs until a first rate succeeds.
+
 ## [0.5.1] - 2026-09-06
 
 ### Fixed

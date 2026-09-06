@@ -129,7 +129,7 @@ func doctorCommand(args []string, out io.Writer) int {
 		d.directory("Exports", o.ExportDir)
 	}
 	if o.NoCache {
-		d.check("INFO", "Cache", "Snapshot and price disk caching are disabled by --no-cache.")
+		d.check("INFO", "Cache", "Snapshot and price/exchange-rate disk caching are disabled by --no-cache.")
 	} else if path, err := priceCachePath(o); err != nil {
 		d.check("FAIL", "Cache directory", err.Error())
 	} else {
@@ -156,7 +156,7 @@ func doctorCommand(args []string, out io.Writer) int {
 		d.check("INFO", "Offline", "Background model-price downloads are disabled. This does not disable currency-rate requests or Bun package downloads.")
 	}
 	if o.Currency != "USD" {
-		d.check("INFO", "Currency", o.Currency+" display requires an online exchange rate; connectivity is not tested. USD is used if unavailable.")
+		d.check("INFO", "Currency", o.Currency+" display reuses exchange rates for 24 hours; connectivity is not tested. Without a saved rate, costs wait for a successful request.")
 	}
 	fmt.Fprintf(out, "\n%d failure(s), %d warning(s).\n", d.failures, d.warnings)
 	if optionFailed {

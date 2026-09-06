@@ -48,6 +48,8 @@ type model struct {
 	themeQuery                            textinput.Model
 	reports                               map[datefilter.Range]Snapshot
 	fxRequest                             int
+	fxTarget                              string
+	exchanges                             map[string]Exchange
 	compactNumbers                        bool
 	info                                  string
 	cached                                bool
@@ -115,7 +117,7 @@ func newModel(ctx context.Context, o Options) model {
 	if o.preferences.ModelsSort == "" {
 		o.preferences.ModelsSort = defaults.ModelsSort
 	}
-	return model{displayLocation: loc, prices: prices, ctx: ctx, o: o, width: 100, height: 32, cost: o.preferences.Display != "tokens", compactNumbers: o.preferences.CompactNumbers, layout: layout, spin: sp, input: ti, fx: usdExchange()}
+	return model{displayLocation: loc, prices: prices, ctx: ctx, o: o, width: 100, height: 32, cost: o.preferences.Display != "tokens", compactNumbers: o.preferences.CompactNumbers, layout: layout, spin: sp, input: ti, fx: initialExchange(o, time.Now())}
 }
 func (m model) Init() tea.Cmd {
 	initial := func() tea.Msg { return "initial-load" }
@@ -258,6 +260,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.fxErr = v.err.Error()
 		} else {
 			m.fx = v.exchange
+			if m.exchanges == nil {
+				m.exchanges = make(map[string]Exchange)
+			}
+			m.exchanges[v.exchange.Currency] = v.exchange
 			m.fxErr = ""
 		}
 	case loadedMsg:
@@ -861,27 +867,51 @@ func (m model) compactView() string {
 }
 
 func (m *model) refreshExchange() tea.Cmd {
-	m.fxRequest++
+	return m.refreshExchangeAt(time.Now())
+}
+
+func (m *model) refreshExchangeAt(now time.Time) tea.Cmd {
+	if m.fxLoading && m.fxTarget == m.o.Currency {
+		return nil
+	}
 	if m.fxCancel != nil {
 		m.fxCancel()
 	}
+	m.fxRequest++
+	m.fxLoading = false
+	m.fxTarget = m.o.Currency
+	if m.fx.Currency != m.o.Currency {
+		if m.fx.available() {
+			if m.exchanges == nil {
+				m.exchanges = make(map[string]Exchange)
+			}
+			m.exchanges[m.fx.Currency] = m.fx
+		}
+		m.fx = initialExchange(m.o, now)
+		m.fxErr = ""
+		if x, ok := m.exchanges[m.o.Currency]; ok && x.FetchedAt.After(m.fx.FetchedAt) {
+			m.fx = x
+		}
+	}
 	if m.o.Currency == "USD" {
 		m.fx = usdExchange()
-		m.fxLoading = false
 		m.fxErr = ""
+		return nil
+	}
+	if m.fx.fresh(now) {
 		return nil
 	}
 	m.fxLoading = true
 	m.fxErr = ""
 	ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
 	m.fxCancel = cancel
-	currency, id, demoMode := m.o.Currency, m.fxRequest, m.o.Demo
+	o, id := m.o, m.fxRequest
 	return func() tea.Msg {
 		defer cancel()
-		if demoMode {
-			return exchangeMsg{exchange: Exchange{Currency: currency, Rate: 0.9, Date: "sample", Source: "synthetic demo rate"}, id: id}
+		if o.Demo {
+			return exchangeMsg{exchange: Exchange{Currency: o.Currency, Rate: 0.9, Date: "sample", Source: "synthetic demo rate", FetchedAt: time.Now()}, id: id}
 		}
-		x, err := fetchExchange(ctx, &http.Client{Timeout: 10 * time.Second}, exchangeEndpoint, currency)
+		x, err := fetchAndCacheExchange(ctx, &http.Client{Timeout: 10 * time.Second}, exchangeEndpoint, o)
 		return exchangeMsg{exchange: x, err: err, id: id}
 	}
 }
@@ -913,11 +943,11 @@ func (m model) formatMetric(v Metric, cost bool) string {
 	return format(v, false)
 }
 func (m model) exchangeStatus() string {
-	if m.fx.Currency == "USD" {
-		if m.fxLoading {
-			return "FX  fetching " + m.o.Currency + " rate · showing USD until ready"
+	if !m.fx.available() {
+		if m.fxErr != "" {
+			return "FX  unavailable for " + m.o.Currency + " · costs unavailable · r retry"
 		}
-		return "FX  unavailable for " + m.o.Currency + " · showing USD · r retry"
+		return "FX  loading " + m.o.Currency + " exchange rate…"
 	}
 	s := m.exchangeLabel()
 	if m.fxErr != "" {
