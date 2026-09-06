@@ -337,9 +337,9 @@ func (m model) pricingStatus() string {
 	if m.s.PriceDate.IsZero() {
 		return "Prices managed by ccusage"
 	}
-	status := "Prices " + m.s.PriceDate.UTC().Format("2006-01-02") + " · LiteLLM"
+	status := "Prices " + m.formatTimestamp(m.s.PriceDate) + " · LiteLLM"
 	if len(m.s.Unpriced) > 0 {
-		status = fmt.Sprintf("Partial prices: %d unpriced · ", len(m.s.Unpriced)) + m.s.PriceDate.UTC().Format("2006-01-02")
+		status = fmt.Sprintf("Partial prices: %d unpriced · ", len(m.s.Unpriced)) + m.formatTimestamp(m.s.PriceDate)
 	}
 	if m.priceLoading {
 		status += " · updating"

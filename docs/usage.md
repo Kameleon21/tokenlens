@@ -24,7 +24,9 @@ All available agent and model names are discovered dynamically. Agent and model 
 | `↑` / `↓`, `j` / `k`, `home` / `end` | Navigate ranked rows |
 | `a` / `f`, `x` | Cycle agent / model filter; clear filters |
 | `n` | Toggle compact k/M/B token labels (inspector remains exact) |
-| `c` / `s` | Cost vs. tokens; descending / ascending / name sorting |
+| `c` | Toggle cost vs. tokens (does not change Sessions/Models sorting) |
+| `s` | Cycle the current tab's sort; Sessions/Models remember independent choices |
+| `Shift+D` / `Shift+H` | Cycle date format / toggle 12- or 24-hour clock; saved automatically |
 | `e` | Cycle USD, EUR, GBP, JPY |
 | `Ctrl+T` | Open searchable theme popup (Shift+T also opens it) |
 | `t` | Edit dates: two dates, `month`, or `last N` |
@@ -36,7 +38,58 @@ All available agent and model names are discovered dynamically. Agent and model 
 | `?`, `esc` | Help; close editor, details, or error |
 | `q` / `ctrl+c` | Quit |
 
-Settings are per run. To keep a default display currency, add `export TOKENLENS_CURRENCY=EUR` to your shell configuration. `--currency` overrides it.
+Display choices are saved in your [configuration file](#saved-preferences). `TOKENLENS_CURRENCY` overrides saved currency, and `--currency` overrides both.
+
+## Sessions and Models sorting
+
+Press `s` in **Models** or **Sessions** to cycle cost (most expensive, cheapest),
+name (A–Z, Z–A), and, for Sessions, start time (newest, oldest). The active field
+and direction are shown beside `[s]`. Each tab remembers its own choice; both
+initially sort by cost, most expensive first. Changing the cost/token display
+with `c` leaves this ordering unchanged. Other tabs keep their existing metric sorting.
+
+Unknown costs are distinct from a known zero and stay last for both cost
+orders. Known partial costs sort by their reported amount and retain `+ ?`.
+Name sorting is case-insensitive. Ties use the original name, agent, start time,
+and last activity in ascending order; duplicate identities retain source order.
+
+Newest/oldest uses the backend's explicit `metadata.firstActivity` instant.
+Missing or invalid start times stay last in either chronological direction;
+Tokenlens never guesses a start from a session ID or assigns all session costs
+to that time. The inspector shows start and last-activity times when reported.
+Sorting compares underlying UTC instants, including offsets and fractional
+seconds, rather than displayed dates. Range filtering remains with the existing
+backend calendar semantics, independent of presentation preferences.
+
+Sorting and formatting run locally against the loaded snapshot. These controls
+make no backend, pricing, or exchange-rate requests, do not invalidate cached
+reports, and work during a refresh. Metadata timestamps are parsed once when
+reading a report or disk cache, never in sort comparisons or rendering.
+
+![Sessions sorted by newest start with readable timestamps, using synthetic data](assets/sessions-sorting.png)
+
+## Timestamp display
+
+Timestamps show time first, in the selected timezone. Press `Shift+D` to cycle
+these date formats and `Shift+H` to independently switch the clock:
+
+| Date preference | 24-hour example | 12-hour example |
+| --- | --- | --- |
+| `european` (default) | 14:35 · 6 Sep 2026 | 2:35 PM · 6 Sep 2026 |
+| `us` | 14:35 · Sep 6, 2026 | 2:35 PM · Sep 6, 2026 |
+| `iso` | 14:35 · 2026-09-06 | 2:35 PM · 2026-09-06 |
+
+The default clock is `24h`. These settings apply to snapshot/cache timestamps,
+price-fetch timestamps, and recognized RFC 3339 session metadata timestamps.
+Date-only period labels, date-range input, and exchange-rate reference dates
+remain date-only; no time is invented for them. `?` opens scrollable help with
+both settings and the sorting controls, including in compact terminals.
+
+JSON and CSV retain full-precision machine-readable timestamps, independently
+of display preferences. Session `first_activity` and `last_activity` use UTC
+RFC 3339 with fractional seconds preserved. Missing session times are omitted
+in JSON and empty in CSV. CSV also includes `snapshot_time` and `price_date`;
+existing JSON snapshot/price timestamps remain unchanged.
 
 ## Dates and billing
 
@@ -115,7 +168,7 @@ Dark, Dracula, Catppuccin Mocha, Solarized Light, and Solarized Dark. The applie
 theme is marked in the list, and the current preview's name appears in the
 header. The popup scrolls to fit compact terminals.
 
-The selection lasts for the current run. Choose a startup theme with `--theme`:
+Applied themes are saved. Use `--theme` for a startup override:
 
 ```sh
 tokenlens --theme nord
@@ -141,7 +194,8 @@ and [Solarized](https://ethanschoonover.com/solarized/).
 
 Tokenlens remembers choices you apply inside the TUI: currency (`e`), theme
 (Ctrl+T then Enter), grouping (`d`/`w`/`m`), cost/token display (`c`), compact
-numbers (`n`), and overview layout (`v`). Theme previews and Escape do not save.
+numbers (`n`), overview layout (`v`), date format (`Shift+D`), clock (`Shift+H`),
+and separate Models/Sessions sort orders (`s` in each tab). Theme previews and Escape do not save.
 These preferences also apply to demo mode. Dates, filters, searches, and the
 current view remain session-only.
 
@@ -165,6 +219,10 @@ grouping = "daily"
 display = "cost"
 compact_numbers = false
 layout = "dashboard"
+date_format = "european" # european, us, iso
+clock_format = "24h"    # 24h, 12h
+models_sort = "cost_desc" # cost_desc, cost_asc, name_asc, name_desc
+sessions_sort = "cost_desc" # same options plus newest, oldest
 ```
 
 Missing fields use defaults. Grouping accepts `daily`, `weekly`, or `monthly`;

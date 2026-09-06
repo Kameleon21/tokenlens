@@ -43,10 +43,13 @@ func (u *Usage) add(v Usage) {
 }
 
 type Row struct {
-	Name, Agent    string
-	Usage          Usage
-	Models, Agents []Row
-	Metadata       map[string]json.RawMessage
+	// Derived once when reading a backend report or disk cache; never during sorting/rendering.
+	firstActivity, lastActivity time.Time
+	metadataTimes               map[string]time.Time
+	Name, Agent                 string
+	Usage                       Usage
+	Models, Agents              []Row
+	Metadata                    map[string]json.RawMessage
 }
 type Snapshot struct {
 	PriceDate     time.Time
@@ -111,6 +114,7 @@ func parseRow(raw json.RawMessage) (Row, error) {
 		}
 	}
 	_ = json.Unmarshal(m["metadata"], &r.Metadata)
+	r.prepareTimes()
 	return r, nil
 }
 func parseSnapshot(b []byte) (Snapshot, error) {
@@ -206,6 +210,7 @@ func filtered(rows []Row, agent, model string) []Row {
 					if a.Agent == agent {
 						a.Name = r.Name
 						a.Metadata = r.Metadata
+						a.firstActivity, a.lastActivity, a.metadataTimes = r.firstActivity, r.lastActivity, r.metadataTimes
 						r = a
 						found = true
 						break

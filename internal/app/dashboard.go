@@ -67,7 +67,7 @@ func (m model) dashboardView() string {
 	head.WriteString(left + strings.Repeat(" ", max(2, w-ansi.StringWidth(left)-ansi.StringWidth(right))) + right + "\n")
 	fresh := "Waiting for first snapshot"
 	if !m.s.Loaded.IsZero() {
-		fresh = "Snapshot " + m.s.Loaded.Local().Format("Jan 02 15:04:05")
+		fresh = "Snapshot " + m.formatTimestamp(m.s.Loaded)
 		if m.cached {
 			fresh = "Cached " + fresh
 		}
@@ -75,7 +75,7 @@ func (m model) dashboardView() string {
 	if m.loading {
 		fresh = m.spin.View() + fmt.Sprintf(" Refreshing usage · %.0fs", time.Since(m.loadingSince).Seconds())
 		if m.cached {
-			fresh += " · cached " + m.s.Loaded.Local().Format("Jan 02 15:04:05")
+			fresh += " · cached " + m.formatTimestamp(m.s.Loaded)
 		}
 	}
 	head.WriteString(muted.Render(m.o.Range.String()+"  ·  "+m.o.TZ) + strings.Repeat(" ", max(2, w-len(m.o.Range.String()+"  ·  "+m.o.TZ)-ansi.StringWidth(fresh))) + muted.Render(fresh) + "\n")
@@ -437,7 +437,7 @@ func (m model) drilldown(w, h int) string {
 	details := muted.Render("Select a row to inspect its metrics.")
 	if len(rows) > 0 {
 		r := rows[min(m.cursor, len(rows)-1)]
-		details = bright.Render(safe(r.Name)) + "\n\n" + muted.Render("ESTIMATED COST · "+m.fx.Currency) + "\n" + accent.Bold(true).Render(m.fx.format(r.Usage.Cost)) + "\n\n" + muted.Render("TOKEN BREAKDOWN") + "\n"
+		details = bright.Render(safe(r.Name)) + "\n" + m.sessionTimes(r) + "\n" + muted.Render("ESTIMATED COST · "+m.fx.Currency) + "\n" + accent.Bold(true).Render(m.fx.format(r.Usage.Cost)) + "\n\n" + muted.Render("TOKEN BREAKDOWN") + "\n"
 		for _, v := range []struct {
 			name string
 			v    Metric
@@ -458,16 +458,24 @@ func (m model) drilldown(w, h int) string {
 			}
 			sort.Strings(keys)
 			for _, k := range keys {
-				details += safe(k+": "+string(r.Metadata[k])) + "\n"
+				details += safe(k+": "+m.metadataValue(r, k)) + "\n"
 			}
 		}
 	}
 	if m.view == 3 {
 		details = m.cacheChart(rightW-6, h-4)
 	}
-	caption := []string{"largest first", "smallest first", "name"}[m.sortMode]
-	return lipgloss.JoinHorizontal(lipgloss.Top, pane(title, caption, m.bars(rows, leftW-6, h-4, true), leftW, h, true), "  ", pane("Inspector", "↑ ↓ select · esc back", details, rightW, h, false))
+	caption := "[s] " + m.sortLabel()
+	return lipgloss.JoinHorizontal(lipgloss.Top, pane(title, "", muted.Render(caption)+"\n"+m.bars(rows, leftW-6, h-5, true), leftW, h, true), "  ", pane("Inspector", "↑ ↓ select · esc back", details, rightW, h, false))
 }
 func (m model) helpText() string {
-	return "1–5 / tab     Overview, agents, models, tokens/cache, sessions\nd / w / m     Daily, weekly, monthly grouping\na / f         Cycle agent / model filter independently\nx             Clear both filters\nc / s         Cost or tokens / sorting order\n[ / ]         Focus overview widget\nenter         Open focused widget or inspect a row\nv             Switch overview layout\ne / ctrl+t    Currency / searchable theme picker\nn             Compact k/M/B token labels (inspector stays exact)\np / b         Date preset / configured plan comparison\no             Export filtered JSON, CSV, SVG, PNG\n← → / hover   Inspect daily stacked bars\nh             Explain unavailable hourly / 5-hour data\n↑ ↓ / j k     Select rows; home/end jump\nt             Edit date range\nr             Refresh usage and exchange rate\nq / ctrl+c    Quit\n\n" + m.exchangeStatus() + "\n\nCost is estimated. Cache savings and spend changes require additional data."
+	return m.displayHelp() + "\n\n1–5 / tab     Overview, agents, models, tokens/cache, sessions\nd / w / m     Daily, weekly, monthly grouping\na / f         Cycle agent / model filter independently\nx             Clear both filters\nc / s         Cost or tokens / sorting order\n[ / ]         Focus overview widget\nenter         Open focused widget or inspect a row\nv             Switch overview layout\ne / ctrl+t    Currency / searchable theme picker\nn             Compact k/M/B token labels (inspector stays exact)\np / b         Date preset / configured plan comparison\no             Export filtered JSON, CSV, SVG, PNG\n← → / hover   Inspect daily stacked bars\nh             Explain unavailable hourly / 5-hour data\n↑ ↓ / j k     Select rows; home/end jump\nt             Edit date range\nr             Refresh usage and exchange rate\nq / ctrl+c    Quit\n\n" + m.exchangeStatus() + "\n\nCost is estimated. Cache savings and spend changes require additional data."
+}
+
+func (m model) helpView() string {
+	w, h := max(1, m.width-4), max(1, m.height-6)
+	lines := strings.Split(m.helpText(), "\n")
+	start := max(0, min(m.helpOffset, max(0, len(lines)-h)))
+	content := bright.Render("CONTROLS") + "\n\n" + fit(strings.Join(lines[start:min(len(lines), start+h)], "\n"), w, h) + "\n" + muted.Render("↑ ↓ scroll · home/end · esc close · q quit")
+	return themeRender(lipgloss.NewStyle().Foreground(ink).Padding(1, 2).Render(fit(content, w, max(1, m.height-2))), m.o.Theme, m.width, m.height)
 }

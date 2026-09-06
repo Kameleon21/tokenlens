@@ -15,6 +15,10 @@ import (
 
 // Preferences contains only choices deliberately remembered between sessions.
 type Preferences struct {
+	DateFormat     string `toml:"date_format"`
+	ClockFormat    string `toml:"clock_format"`
+	SessionsSort   string `toml:"sessions_sort"`
+	ModelsSort     string `toml:"models_sort"`
 	Currency       string `toml:"currency"`
 	Theme          string `toml:"theme"`
 	Grouping       string `toml:"grouping"`
@@ -24,7 +28,7 @@ type Preferences struct {
 }
 
 func defaultPreferences() Preferences {
-	return Preferences{Currency: "USD", Theme: "dark", Grouping: "daily", Display: "cost", Layout: "dashboard"}
+	return Preferences{DateFormat: "european", ClockFormat: "24h", SessionsSort: "cost_desc", ModelsSort: "cost_desc", Currency: "USD", Theme: "dark", Grouping: "daily", Display: "cost", Layout: "dashboard"}
 }
 
 func configPath() (string, error) {
@@ -52,6 +56,18 @@ func configPathFor(goos string, getenv func(string) string, home func() (string,
 }
 
 func (p Preferences) validate() error {
+	if !slices.Contains([]string{"european", "us", "iso"}, p.DateFormat) {
+		return fmt.Errorf("date_format must be european, us, or iso")
+	}
+	if !slices.Contains([]string{"12h", "24h"}, p.ClockFormat) {
+		return fmt.Errorf("clock_format must be 12h or 24h")
+	}
+	if !slices.Contains(sessionSorts, p.SessionsSort) {
+		return fmt.Errorf("invalid sessions_sort %q", p.SessionsSort)
+	}
+	if !slices.Contains(modelSorts, p.ModelsSort) {
+		return fmt.Errorf("invalid models_sort %q", p.ModelsSort)
+	}
 	if _, err := currencyCode(p.Currency); err != nil {
 		return err
 	}

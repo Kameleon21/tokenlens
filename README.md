@@ -65,7 +65,7 @@ tokenlens --theme nord  # Ctrl+T opens the theme picker
 ```
 
 The default date range is this calendar month. Dates are inclusive. Tokenlens uses your system timezone by default. `TZ` overrides it, and `--timezone` takes priority over both.
-Currency, applied theme, grouping, and display choices are remembered automatically.
+Currency, applied theme, grouping, timestamp formats, per-tab sorting, and display choices are remembered automatically.
 On macOS and Linux they live in `~/.config/tokenlens/config.toml` (or
 `$XDG_CONFIG_HOME/tokenlens/config.toml`). Run `tokenlens config path` to locate
 the file or `tokenlens config reset` to reset preferences.
@@ -79,6 +79,8 @@ See [saved preferences](docs/usage.md#saved-preferences) for all settings and Wi
 | `a` / `f` / `x` | Filter agent, filter model, clear filters |
 | `t` / `p` | Enter dates / cycle date presets |
 | `c` / `e` | Switch cost/token view / currency |
+| `s` | Cycle sort order; Models and Sessions remember their own choice |
+| `Shift+D` / `Shift+H` | Date format / 12- or 24-hour clock (saved) |
 | `r` | Fetch a fresh report |
 | `o` | Export JSON, CSV, SVG, or PNG |
 | `Ctrl+T` | Search and preview themes |
