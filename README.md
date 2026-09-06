@@ -37,7 +37,7 @@ tokenlens --demo
 tokenlens --currency EUR
 tokenlens weekly --last 8
 tokenlens --since 2026-08-01 --until 2026-08-31
-tokenlens --theme nord  # Shift+T cycles themes inside the app
+tokenlens --theme nord  # Ctrl+T opens the theme picker
 ```
 
 The default date range is this calendar month. Dates are inclusive. The timezone is UTC unless you set `TZ` or `--timezone`.
@@ -52,6 +52,7 @@ Set `TOKENLENS_CURRENCY=EUR` in your shell to keep euros as your default.
 | `c` / `e` | Switch cost/token view / currency |
 | `r` | Fetch a fresh report |
 | `o` | Export JSON, CSV, SVG, or PNG |
+| `Ctrl+T` | Search and preview themes |
 | `?` / `q` | All controls / quit |
 
 ## Loading speed

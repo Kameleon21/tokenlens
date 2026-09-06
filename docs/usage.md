@@ -26,7 +26,7 @@ All available agent and model names are discovered dynamically. Agent and model 
 | `n` | Toggle compact k/M/B token labels (inspector remains exact) |
 | `c` / `s` | Cost vs. tokens; descending / ascending / name sorting |
 | `e` | Cycle USD, EUR, GBP, JPY |
-| `T` | Cycle theme (active name appears at the top) |
+| `Ctrl+T` | Open searchable theme popup (Shift+T also opens it) |
 | `t` | Edit dates: two dates, `month`, or `last N` |
 | `p` | Calendar month → billing cycle → last 30 days → since August 1 |
 | `b` | Toggle configured subscription-plan comparison |
@@ -94,12 +94,18 @@ Press `o`, then choose JSON, CSV, SVG, or PNG. Files go into `./exports` (or `--
 
 ### Themes
 
-Press `Shift+T` inside the dashboard to cycle through Dark, Light, ASCII, Nord,
-Gruvbox, Tokyo Night Light, Dracula, Catppuccin Mocha, and Solarized Light.
-The palette changes immediately, including charts, highlights, and backgrounds.
-A prominent `Theme: Nord [4/9]` indicator at the top always shows the current
-theme, its position in the cycle, and the `Shift+T next` shortcut, including in
-compact terminals.
+Press `Ctrl+T` to open the centered theme picker. Type a name or a fuzzy query
+such as `tnd` for Tokyo Night Dark. Use Up/Down, Ctrl+N/Ctrl+P, or Tab/Shift+Tab
+to preview matches live on the dashboard. Enter applies the selection; Escape
+restores the theme you had before opening the popup. Shift+T remains an alias
+for opening the picker. While searching, letter keys enter text rather than
+triggering dashboard shortcuts.
+
+Choose from Dark, Light, ASCII, Nord, Gruvbox, Tokyo Night Light, Tokyo Night
+Dark, Dracula, Catppuccin Mocha, Solarized Light, and Solarized Dark. The applied
+theme is marked in the list, and the current preview's name appears in the
+header. The popup scrolls to fit compact terminals.
+
 The selection lasts for the current run. Choose a startup theme with `--theme`:
 
 ```sh
@@ -109,6 +115,8 @@ tokenlens --theme tokyo-light
 tokenlens --theme dracula
 tokenlens --theme catppuccin
 tokenlens --theme solarized-light
+tokenlens --theme tokyo-dark
+tokenlens --theme solarized-dark
 ```
 
 Existing `dark` (default), `light`, and `ascii` values remain available.
@@ -117,5 +125,5 @@ Palettes are adapted for terminal dashboards from [Nord](https://www.nordtheme.c
 [Dracula](https://draculatheme.com/contribute), [Catppuccin](https://catppuccin.com/palette/),
 and [Solarized](https://ethanschoonover.com/solarized/).
 
-![Nord dashboard with synthetic demo data](assets/theme-nord.png)
-![Dracula dashboard with synthetic demo data](assets/theme-dracula.png)
+![Searchable theme picker with synthetic data](assets/theme-picker.png)
+![Theme picker in a compact terminal](assets/theme-picker-compact.png)

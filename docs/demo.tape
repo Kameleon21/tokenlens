@@ -49,14 +49,19 @@ Type "e"
 Sleep 2s
 
 # Show the light theme and the export controls.
-Type "T"
+Ctrl+t
+Type "light"
+Sleep 1s
+Enter
 Sleep 2s
 Type "o"
 Sleep 2s
 Escape
 
 # Return to the original dashboard for a clean loop.
-Type "TTTTTTTT"
+Ctrl+t
+Type "dark"
+Enter
 Type "eeed"
 Sleep 3s
 Hide

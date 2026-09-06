@@ -5,6 +5,16 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+### Added
+
+- Tokyo Night Dark and Solarized Dark palettes.
+- Searchable theme popup with fuzzy filtering, keyboard navigation, live preview,
+  Enter to apply, and Escape to restore the previous theme. Open with Ctrl+T.
+
+### Changed
+
+- Shift+T opens the theme picker instead of cycling palettes.
+
 ## [0.1.0] - 2026-09-06
 
 ### Added
