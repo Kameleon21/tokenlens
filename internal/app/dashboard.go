@@ -138,12 +138,12 @@ func (m model) dashboardView() string {
 	bodyH := max(5, h-lipgloss.Height(prefix)-1)
 	var body string
 	switch {
+	case m.help:
+		body = pane("CONTROLS", "esc close", m.helpContent(bodyH-4), w, bodyH, true)
 	case m.info != "":
 		body = pane("DATA AVAILABILITY", "esc close", m.info, w, bodyH, true)
 	case m.exporting:
 		body = pane("EXPORT FILTERED VIEW", "esc cancel", "[1] JSON · complete metrics and currency metadata\n[2] CSV · spreadsheet-ready values\n[3] SVG · vector chart\n[4] PNG · chart image\n\nExports use the selected range, filters, grouping and currency.\nDirectory: "+safe(m.o.ExportDir), w, bodyH, true)
-	case m.help:
-		body = pane("CONTROLS", "esc close", m.helpText(), w, bodyH, true)
 	case m.editing != "":
 		body = pane("DATE RANGE", "enter apply · esc cancel", m.input.View()+"\n\n"+muted.Render(m.rangeHelp())+"\n\n"+safe(m.err), w, bodyH, true)
 	case m.err != "":
@@ -171,6 +171,9 @@ func (m model) dashboardView() string {
 		body = row(order[0], order[1], topH) + "\n" + row(order[2], order[3], bottomH)
 	}
 	footer := muted.Render("Ctrl+T themes  [ / ] widgets  enter open  v layout  e currency  p preset  b plan  o export  c metric  ? help  q quit")
+	if m.help {
+		footer = muted.Render("↑ ↓ scroll · home/end · esc close · ? close · q quit")
+	}
 	content := fit(prefix+body, w, h-1) + "\n" + fit(footer, w, 1)
 	return themeRender(lipgloss.NewStyle().Foreground(ink).Padding(1, 2).Render(content), m.o.Theme, m.width, m.height)
 }
@@ -475,10 +478,9 @@ func (m model) helpText() string {
 	return m.displayHelp() + "\n\n1–5 / tab     Overview, agents, models, tokens/cache, sessions\nd / w / m     Daily, weekly, monthly grouping\na / f         Cycle agent / model filter independently\nx             Clear both filters\nc / s         Cost or tokens / sorting order\n[ / ]         Focus overview widget\nenter         Open focused widget or inspect a row\nv             Switch overview layout\ne / ctrl+t    Currency / searchable theme picker\nn             Compact k/M/B token labels (inspector stays exact)\np / b         Date preset / configured plan comparison\no             Export filtered JSON, CSV, SVG, PNG\n← → / hover   Inspect daily stacked bars\nh             Explain unavailable hourly / 5-hour data\n↑ ↓ / j k     Select rows; home/end jump\nt             Edit date range\nr             Refresh usage; exchange rate after 24h\nq / ctrl+c    Quit\n\n" + m.exchangeStatus() + "\n\nCost is estimated. Cache savings and spend changes require additional data."
 }
 
-func (m model) helpView() string {
-	w, h := max(1, m.width-4), max(1, m.height-6)
+func (m model) helpContent(height int) string {
 	lines := strings.Split(m.helpText(), "\n")
-	start := max(0, min(m.helpOffset, max(0, len(lines)-h)))
-	content := bright.Render("CONTROLS") + "\n\n" + fit(strings.Join(lines[start:min(len(lines), start+h)], "\n"), w, h) + "\n" + muted.Render("↑ ↓ scroll · home/end · esc close · q quit")
-	return themeRender(lipgloss.NewStyle().Foreground(ink).Padding(1, 2).Render(fit(content, w, max(1, m.height-2))), m.o.Theme, m.width, m.height)
+	height = max(1, height)
+	start := max(0, min(m.helpOffset, max(0, len(lines)-height)))
+	return strings.Join(lines[start:min(len(lines), start+height)], "\n")
 }
