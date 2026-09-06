@@ -5,6 +5,17 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+## [0.3.0] - 2026-09-06
+
+### Added
+
+- Remember currency, applied theme, daily/weekly/monthly grouping, cost/token
+  display, compact numbers, and overview layout across launches.
+- Save preferences in `~/.config/tokenlens/config.toml` on macOS and Linux,
+  respecting `XDG_CONFIG_HOME`, and in `%AppData%` on Windows.
+- `tokenlens config path` and `tokenlens config reset` commands. Explicit CLI
+  and environment overrides remain temporary; theme previews do not save.
+
 ## [0.2.0] - 2026-09-06
 
 ### Added
@@ -40,3 +51,5 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 [0.2.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.1.0
+
+[0.3.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.3.0

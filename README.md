@@ -50,7 +50,12 @@ tokenlens --theme nord  # Ctrl+T opens the theme picker
 ```
 
 The default date range is this calendar month. Dates are inclusive. Tokenlens uses your system timezone by default. `TZ` overrides it, and `--timezone` takes priority over both.
-Set `TOKENLENS_CURRENCY=EUR` in your shell to keep euros as your default.
+Currency, applied theme, grouping, and display choices are remembered automatically.
+On macOS and Linux they live in `~/.config/tokenlens/config.toml` (or
+`$XDG_CONFIG_HOME/tokenlens/config.toml`). Run `tokenlens config path` to locate
+the file or `tokenlens config reset` to reset preferences.
+See [saved preferences](docs/usage.md#saved-preferences) for all settings and Windows paths.
+`TOKENLENS_CURRENCY` and explicit CLI flags override saved defaults for that launch.
 
 | Key | What it does |
 | --- | --- |
