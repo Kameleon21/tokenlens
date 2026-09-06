@@ -10,8 +10,8 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Keep CLI validation, keyboard cycling, and palettes in the same order.
-var themeNames = []string{"dark", "light", "ascii", "nord", "gruvbox", "tokyo-light", "dracula", "catppuccin", "solarized-light"}
+// Keep CLI validation, theme picker, and palettes in the same order.
+var themeNames = []string{"dark", "light", "ascii", "nord", "gruvbox", "tokyo-light", "dracula", "catppuccin", "solarized-light", "tokyo-dark", "solarized-dark"}
 
 type themePalette struct {
 	label, background, foreground, muted, accent, border, surface string
@@ -27,6 +27,8 @@ var themePalettes = map[string]themePalette{
 	"dracula":         {"Dracula", "#282A36", "#F8F8F2", "#BDBDCB", "#BD93F9", "#6272A4", "#44475A", [6]string{"#8BE9FD", "#BD93F9", "#F1FA8C", "#FF79C6", "#FFB86C", "#50FA7B"}},
 	"catppuccin":      {"Catppuccin Mocha", "#1E1E2E", "#CDD6F4", "#A6ADC8", "#CBA6F7", "#585B70", "#313244", [6]string{"#94E2D5", "#CBA6F7", "#F9E2AF", "#89B4FA", "#F5C2E7", "#A6E3A1"}},
 	"solarized-light": {"Solarized Light", "#FDF6E3", "#586E75", "#657B83", "#007F78", "#93A1A1", "#EEE8D5", [6]string{"#007F78", "#6C71C4", "#9A7000", "#268BD2", "#D33682", "#738000"}},
+	"tokyo-dark":      {"Tokyo Night Dark", "#1A1B26", "#C0CAF5", "#A9B1D6", "#7AA2F7", "#545C7E", "#292E42", [6]string{"#7DCFFF", "#BB9AF7", "#E0AF68", "#7AA2F7", "#FF9E64", "#9ECE6A"}},
+	"solarized-dark":  {"Solarized Dark", "#002B36", "#839496", "#93A1A1", "#2AA198", "#586E75", "#073642", [6]string{"#2AA198", "#6C71C4", "#B58900", "#268BD2", "#D33682", "#859900"}},
 }
 
 var activeTheme = "dark"
@@ -47,14 +49,7 @@ func themeLabel(name string) string {
 
 // themeIndicator stays visible above the content, including in compact terminals.
 func (m model) themeIndicator() string {
-	index := 1
-	for i, name := range themeNames {
-		if name == m.o.Theme {
-			index = i + 1
-			break
-		}
-	}
-	return accent.Bold(true).Render(fmt.Sprintf("Theme: %s  [%d/%d]", themeLabel(m.o.Theme), index, len(themeNames))) + muted.Render("  Shift+T next")
+	return accent.Bold(true).Render("Theme: "+themeLabel(m.o.Theme)) + muted.Render("  Ctrl+T choose")
 }
 
 func applyTheme(name string) {

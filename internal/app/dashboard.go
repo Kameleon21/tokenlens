@@ -51,7 +51,7 @@ func chip(s string, selected bool, c lipgloss.Color) string {
 	}
 	return style.Render(s)
 }
-func (m model) View() string {
+func (m model) dashboardView() string {
 	if m.width < 96 || m.height < 32 {
 		return m.compactView()
 	}
@@ -170,7 +170,7 @@ func (m model) View() string {
 		}
 		body = row(order[0], order[1], topH) + "\n" + row(order[2], order[3], bottomH)
 	}
-	footer := muted.Render("Shift+T theme  [ / ] widgets  enter open  v layout  e currency  p preset  b plan  o export  c metric  ? help  q quit")
+	footer := muted.Render("Ctrl+T themes  [ / ] widgets  enter open  v layout  e currency  p preset  b plan  o export  c metric  ? help  q quit")
 	content := fit(prefix+body, w, h-1) + "\n" + fit(footer, w, 1)
 	return themeRender(lipgloss.NewStyle().Foreground(ink).Padding(1, 2).Render(content), m.o.Theme, m.width, m.height)
 }
@@ -469,5 +469,5 @@ func (m model) drilldown(w, h int) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, pane(title, caption, m.bars(rows, leftW-6, h-4, true), leftW, h, true), "  ", pane("Inspector", "↑ ↓ select · esc back", details, rightW, h, false))
 }
 func (m model) helpText() string {
-	return "1–5 / tab     Overview, agents, models, tokens/cache, sessions\nd / w / m     Daily, weekly, monthly grouping\na / f         Cycle agent / model filter independently\nx             Clear both filters\nc / s         Cost or tokens / sorting order\n[ / ]         Focus overview widget\nenter         Open focused widget or inspect a row\nv             Switch overview layout\ne / T         Currency (USD/EUR/GBP/JPY) / theme\nn             Compact k/M/B token labels (inspector stays exact)\np / b         Date preset / configured plan comparison\no             Export filtered JSON, CSV, SVG, PNG\n← → / hover   Inspect daily stacked bars\nh             Explain unavailable hourly / 5-hour data\n↑ ↓ / j k     Select rows; home/end jump\nt             Edit date range\nr             Refresh usage and exchange rate\nq / ctrl+c    Quit\n\n" + m.exchangeStatus() + "\n\nCost is estimated. Cache savings and spend changes require additional data."
+	return "1–5 / tab     Overview, agents, models, tokens/cache, sessions\nd / w / m     Daily, weekly, monthly grouping\na / f         Cycle agent / model filter independently\nx             Clear both filters\nc / s         Cost or tokens / sorting order\n[ / ]         Focus overview widget\nenter         Open focused widget or inspect a row\nv             Switch overview layout\ne / ctrl+t    Currency / searchable theme picker\nn             Compact k/M/B token labels (inspector stays exact)\np / b         Date preset / configured plan comparison\no             Export filtered JSON, CSV, SVG, PNG\n← → / hover   Inspect daily stacked bars\nh             Explain unavailable hourly / 5-hour data\n↑ ↓ / j k     Select rows; home/end jump\nt             Edit date range\nr             Refresh usage and exchange rate\nq / ctrl+c    Quit\n\n" + m.exchangeStatus() + "\n\nCost is estimated. Cache savings and spend changes require additional data."
 }

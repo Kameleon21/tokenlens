@@ -16,48 +16,43 @@ Env NO_COLOR ""
 Env TERM "xterm-256color"
 Env COLORTERM "truecolor"
 
-# Start on the populated overview so the first frame explains the product.
+# Start on a populated overview; all usage and exchange rates are synthetic.
 Hide
-Type "./bin/tokenlens --demo --currency EUR --since 20260901 --until 20260930"
+Type "./bin/tokenlens --demo --no-cache --currency EUR --since 20260901 --until 20260930"
 Enter
 Wait+Screen /synthetic demo rate/
 Sleep 500ms
 Show
-Sleep 3s
+Sleep 3.5s
 
-# Inspect an exact day, then compare models and token counts.
-Right 3
-Sleep 1s
-Enter
-Sleep 2.5s
+# Compare models and understand the token/cache mix.
 Type "3"
-Sleep 2s
-Type "c"
-Sleep 1.5s
-Type "c"
-
-# Independent agent filter, then the cache breakdown.
-Type "a"
-Sleep 1.5s
-Type "x4"
+Sleep 3s
+Type "4"
+Sleep 3s
+Type "1w"
 Sleep 2.5s
 
-# Weekly grouping and a different display currency (synthetic demo rate).
-Type "1w"
+# Show the whole picker, then fuzzy-search and apply Tokyo Night Dark.
+Ctrl+t
 Sleep 2s
-Type "e"
+Type "tnd"
+Sleep 2s
+Enter
+Sleep 1.5s
+
+# Preview and apply Solarized Dark.
+Ctrl+t
+Type "solarized dark"
+Sleep 2s
+Enter
 Sleep 2s
 
-# Show the light theme and the export controls.
-Type "T"
-Sleep 2s
-Type "o"
-Sleep 2s
-Escape
-
-# Return to the original dashboard for a clean loop.
-Type "TTTTTTTT"
-Type "eeed"
-Sleep 3s
+# Restore the starting palette and daily view for the loop.
+Ctrl+t
+Type "dark"
+Enter
+Type "d"
+Sleep 2.5s
 Hide
 Type "q"
