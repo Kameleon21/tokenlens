@@ -1,8 +1,9 @@
 # Versioning and releases
 
 Tokenlens uses semantic versions (`MAJOR.MINOR.PATCH`) and Git tags with a `v`
-prefix, starting at `v0.1.0`. The first version is being prepared; it becomes a
-published release only when its tag and GitHub release exist.
+prefix, starting at `v0.1.0`. The application version and release notes are recorded in
+`internal/app/version.go` and `CHANGELOG.md`. Published versions are listed on
+[GitHub Releases](https://github.com/Kameleon21/tokenlens/releases).
 
 ## Choosing a version
 
