@@ -119,3 +119,7 @@ and [governance](GOVERNANCE.md). Report vulnerabilities privately using the
 [MIT](LICENSE).
 
 Powered by [ccusage](https://github.com/ccusage/ccusage), created by [ryoppippi](https://github.com/ryoppippi) and distributed under the [MIT license](third_party/ccusage-LICENSE).
+
+For a local installation/configuration health report, run `tokenlens doctor`.
+Save an export destination with `export_dir = "~/Downloads/tokenlens-exports"`
+in your TOML preferences; `--export-dir` overrides it for one run.

@@ -152,7 +152,7 @@ There is no local log parser, telemetry, usage upload, or Tokenlens npm launcher
 
 ## Exports
 
-Press `o`, then choose JSON, CSV, SVG, or PNG. Files go into `./exports` (or `--export-dir`) and are never overwritten. JSON/CSV contain all filtered rows, underlying USD estimates, display currency/rate metadata, and the selected range. SVG/PNG are standalone ranked charts of up to 30 rows. Image charts are not full-terminal screenshots. CSV labels are escaped to remain text in spreadsheets. Exported usage can contain private names; the default export directory is gitignored.
+Press `o`, then choose JSON, CSV, SVG, or PNG. Files go into `./exports` by default and are never overwritten. Set `export_dir` in your TOML preferences to persist a destination; `--export-dir` overrides it for one run. Both accept absolute paths and `~/` for your home directory. Relative paths are resolved against the directory where you launch Tokenlens, not the config file. Environment variables inside TOML paths are not expanded. JSON/CSV contain all filtered rows, underlying USD estimates, display currency/rate metadata, and the selected range. SVG/PNG are standalone ranked charts of up to 30 rows. Image charts are not full-terminal screenshots. CSV labels are escaped to remain text in spreadsheets. Exported usage can contain private names; the default export directory is gitignored.
 
 ### Themes
 
@@ -219,6 +219,7 @@ grouping = "daily"
 display = "cost"
 compact_numbers = false
 layout = "dashboard"
+export_dir = "~/Downloads/tokenlens-exports" # default: exports (relative to launch directory)
 date_format = "european" # european, us, iso
 clock_format = "24h"    # 24h, 12h
 models_sort = "cost_desc" # cost_desc, cost_asc, name_asc, name_desc
@@ -250,3 +251,31 @@ edit the file or use `tokenlens config reset` to recover. `--help`, `--version`,
 and config commands remain available even with invalid preferences. A failed
 save shows a notice and leaves the current TUI choice usable for that session.
 Reset affects future launches; an already open TUI can save new choices again.
+
+## Diagnose installation and configuration
+
+Run `tokenlens doctor` for a local health report without opening the TUI.
+It accepts the normal flags, for example:
+
+```sh
+tokenlens doctor
+tokenlens doctor --export-dir ~/Downloads/tokenlens-exports
+tokenlens doctor --ccusage /path/to/ccusage --timezone Europe/Dublin
+```
+
+Doctor reports the application version and executable, current working directory,
+config path and validity, effective timezone and export path, export/cache write
+access, backend discovery, and local pricing catalog age. It also explains
+offline mode, custom ccusage configuration, disabled caching, and currency-rate
+requirements. If the config is invalid, Doctor reports the error and continues
+using defaults plus CLI/environment overrides for the remaining checks.
+
+Missing export/cache folders are normal on first use: Doctor probes the nearest
+existing parent without creating the directory tree. It creates and removes a
+temporary file to test write access. It does not change preferences, repair files,
+collect usage, execute the backend, download packages, or make network requests.
+A discovered backend is not a guarantee that its execution or report format works;
+connectivity and actual session data are not tested.
+
+Exit codes: `0` means no failed checks (warnings can remain), `1` means a failed
+health check, and `2` means invalid command-line/effective options.

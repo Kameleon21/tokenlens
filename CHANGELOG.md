@@ -5,6 +5,15 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+## [0.5.0] - 2026-09-06
+
+### Added
+
+- Persistent `export_dir` in TOML preferences, with home-directory expansion and per-run `--export-dir` overrides.
+- `tokenlens doctor` for local configuration, path access, timezone, backend discovery, and pricing diagnostics with actionable messages and exit codes.
+
+## [0.4.1] - 2026-09-06
+
 ### Fixed
 
 - Apply the saved date format across all tabs, overview charts, activity details, range editing, exchange-rate labels, and SVG/PNG exports.
@@ -86,3 +95,7 @@ User-visible changes are recorded here. Versions follow the conventions in
 [0.3.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.3.0
 
 [0.4.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.4.0
+
+[0.4.1]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.4.1
+
+[0.5.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.5.0
