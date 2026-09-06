@@ -18,7 +18,7 @@ Env COLORTERM "truecolor"
 
 # Start on the populated overview so the first frame explains the product.
 Hide
-Type "./bin/tokenlens --demo --currency EUR --since 20260901 --until 20260930"
+Type "./bin/tokenlens --demo --timezone UTC --currency EUR --since 20260901 --until 20260930"
 Enter
 Wait+Screen /synthetic demo rate/
 Sleep 500ms

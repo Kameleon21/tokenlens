@@ -4,6 +4,11 @@
   <img src="docs/assets/mascot-lensbot.png" width="220" alt="Tokenlens mascot: a mint lens robot inspecting a lavender token tile">
 </p>
 
+[![Release](https://img.shields.io/github/v/release/Kameleon21/tokenlens?style=flat)](https://github.com/Kameleon21/tokenlens/releases/latest)
+[![Checks](https://img.shields.io/github/actions/workflow/status/Kameleon21/tokenlens/ci.yml?branch=main&label=checks&style=flat)](https://github.com/Kameleon21/tokenlens/actions/workflows/ci.yml)
+[![Stars](https://img.shields.io/github/stars/Kameleon21/tokenlens?style=flat)](https://github.com/Kameleon21/tokenlens/stargazers)
+[![Contributors](https://img.shields.io/github/contributors/Kameleon21/tokenlens?style=flat)](https://github.com/Kameleon21/tokenlens/graphs/contributors)
+
 See your coding-agent token usage and estimated costs in your terminal. Compare agents and models, explore dates, and export reports.
 
 ![Tokenlens demo](docs/assets/demo.gif)
@@ -40,7 +45,7 @@ tokenlens --since 2026-08-01 --until 2026-08-31
 tokenlens --theme nord  # Shift+T cycles themes inside the app
 ```
 
-The default date range is this calendar month. Dates are inclusive. The timezone is UTC unless you set `TZ` or `--timezone`.
+The default date range is this calendar month. Dates are inclusive. Tokenlens uses your system timezone by default. `TZ` overrides it, and `--timezone` takes priority over both.
 Set `TOKENLENS_CURRENCY=EUR` in your shell to keep euros as your default.
 
 | Key | What it does |

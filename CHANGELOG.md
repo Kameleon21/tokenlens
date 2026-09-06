@@ -5,6 +5,11 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+### Changed
+
+- Default to the system timezone instead of UTC for calendar ranges and backend
+  reports. `TZ` and `--timezone` remain explicit overrides.
+
 ## [0.1.0] - 2026-09-06
 
 ### Added

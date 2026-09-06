@@ -30,7 +30,11 @@ type Options struct {
 }
 
 func options(args []string, now time.Time) (Options, error) {
-	o := Options{Group: "daily", TZ: "UTC", Bin: "ccusage", Currency: "USD"}
+	return optionsWithLocalTimezone(args, now, localTimezone)
+}
+
+func optionsWithLocalTimezone(args []string, now time.Time, detect func() (string, error)) (Options, error) {
+	o := Options{Group: "daily", Bin: "ccusage", Currency: "USD"}
 	if c := os.Getenv("TOKENLENS_CURRENCY"); c != "" {
 		o.Currency = c
 	}
@@ -48,7 +52,7 @@ func options(args []string, now time.Time) (Options, error) {
 	f.StringVar(&since, "since", "", "inclusive start: YYYY-MM-DD or YYYYMMDD")
 	f.StringVar(&until, "until", "", "inclusive end: YYYY-MM-DD or YYYYMMDD")
 	f.IntVar(&last, "last", 0, "last N periods including current; cannot combine with date bounds")
-	f.StringVar(&o.TZ, "timezone", o.TZ, "IANA timezone (default UTC, or TZ environment variable)")
+	f.StringVar(&o.TZ, "timezone", o.TZ, "IANA timezone (default system timezone; TZ overrides the system default)")
 	f.StringVar(&o.Bin, "ccusage", "ccusage", "ccusage executable path")
 	f.StringVar(&o.CacheDir, "cache-dir", "", "snapshot cache directory (default OS user cache / tokenlens)")
 	f.BoolVar(&o.Offline, "offline", false, "use ccusage cached pricing for speed (estimates may differ)")
@@ -101,6 +105,15 @@ func options(args []string, now time.Time) (Options, error) {
 	}
 	o.Currency = currency
 	o.PlanCurrency = currency
+	if o.TZ == "" {
+		o.TZ, e = detect()
+		if e != nil {
+			return o, e
+		}
+	}
+	if !validTimezone(o.TZ) {
+		return o, fmt.Errorf("invalid IANA timezone %q", o.TZ)
+	}
 	loc, e := time.LoadLocation(o.TZ)
 	if e != nil {
 		return o, fmt.Errorf("invalid timezone %q", o.TZ)
