@@ -15,6 +15,7 @@ release-check:
 
 release-snapshot: check release-check
 	goreleaser release --snapshot --clean
+	python3 scripts/verify_bundles.py
 
 # Example: make release-prepare BUMP=minor
 release-prepare:
