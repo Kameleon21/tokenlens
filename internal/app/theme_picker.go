@@ -96,6 +96,9 @@ func (m model) updateThemePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
+	if m.help && !m.choosingTheme {
+		return m.helpView()
+	}
 	base := m.dashboardView()
 	if !m.choosingTheme {
 		return base

@@ -7,6 +7,10 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ### Added
 
+- Saved European, U.S., and ISO timestamp formats with independent 12-/24-hour clocks, respecting the selected timezone.
+- Independent saved cost and name sorting for Models and Sessions, plus newest/oldest session starts; missing costs and start times remain last.
+- Precise session timestamps in JSON/CSV exports and scrollable help for compact terminals.
+
 - Native ccusage bundled for all six release platforms, with verified dependency integrity.
 - Local model prices and background refresh for faster uncached loads, with price dates and explicit incomplete-cost coverage.
 - A checksum-verifying macOS/Linux release updater that keeps the complete bundle together and preserves preferences.

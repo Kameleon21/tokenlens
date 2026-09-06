@@ -55,6 +55,7 @@ func readSnapshotCache(o Options, r datefilter.Range) (Snapshot, error) {
 	if time.Since(entry.Snapshot.Loaded) > 7*24*time.Hour {
 		return Snapshot{}, fmt.Errorf("cached snapshot expired")
 	}
+	entry.Snapshot.prepareTimes()
 	return entry.Snapshot, nil
 }
 func writeSnapshotCache(o Options, r datefilter.Range, s Snapshot) error {

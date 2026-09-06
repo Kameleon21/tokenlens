@@ -36,6 +36,8 @@ type exchangeMsg struct {
 	id       int
 }
 type model struct {
+	helpOffset                            int
+	displayLocation                       *time.Location
 	prices                                priceCatalog
 	priceLoading                          bool
 	priceAttempt                          time.Time
@@ -96,7 +98,24 @@ func newModel(ctx context.Context, o Options) model {
 		prices = initialPrices(o)
 		o.priceRevision = prices.revision()
 	}
-	return model{prices: prices, ctx: ctx, o: o, width: 100, height: 32, cost: o.preferences.Display != "tokens", compactNumbers: o.preferences.CompactNumbers, layout: layout, spin: sp, input: ti, fx: usdExchange()}
+	loc, err := time.LoadLocation(o.TZ)
+	if err != nil {
+		loc = time.UTC
+	}
+	defaults := defaultPreferences()
+	if o.preferences.DateFormat == "" {
+		o.preferences.DateFormat = defaults.DateFormat
+	}
+	if o.preferences.ClockFormat == "" {
+		o.preferences.ClockFormat = defaults.ClockFormat
+	}
+	if o.preferences.SessionsSort == "" {
+		o.preferences.SessionsSort = defaults.SessionsSort
+	}
+	if o.preferences.ModelsSort == "" {
+		o.preferences.ModelsSort = defaults.ModelsSort
+	}
+	return model{displayLocation: loc, prices: prices, ctx: ctx, o: o, width: 100, height: 32, cost: o.preferences.Display != "tokens", compactNumbers: o.preferences.CompactNumbers, layout: layout, spin: sp, input: ti, fx: usdExchange()}
 }
 func (m model) Init() tea.Cmd {
 	initial := func() tea.Msg { return "initial-load" }
@@ -348,6 +367,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if key == "?" {
 			m.help = !m.help
+			m.helpOffset = 0
 			return m, nil
 		}
 		if key == "ctrl+t" || key == "T" {
@@ -355,6 +375,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		if m.help {
+			switch key {
+			case "j", "down":
+				m.helpOffset++
+			case "k", "up":
+				m.helpOffset--
+			case "home":
+				m.helpOffset = 0
+			case "end":
+				m.helpOffset = len(strings.Split(m.helpText(), "\n"))
+			}
+			m.helpOffset = max(0, min(m.helpOffset, max(0, len(strings.Split(m.helpText(), "\n"))-max(1, m.height-6))))
 			return m, nil
 		}
 		switch key {
@@ -393,8 +424,26 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			})
 		case "s":
-			m.sortMode = (m.sortMode + 1) % 3
+			switch m.view {
+			case 2:
+				m.o.preferences.ModelsSort = cycle(modelSorts, m.tabSort())
+				m.savePreference(func(p *Preferences) { p.ModelsSort = m.o.preferences.ModelsSort })
+			case 4:
+				m.o.preferences.SessionsSort = cycle(sessionSorts, m.tabSort())
+				m.savePreference(func(p *Preferences) { p.SessionsSort = m.o.preferences.SessionsSort })
+			default:
+				m.sortMode = (m.sortMode + 1) % 3
+			}
 			m.cursor = 0
+			return m, nil
+		case "D":
+			m.o.preferences.DateFormat = cycle([]string{"european", "us", "iso"}, m.o.preferences.DateFormat)
+			m.savePreference(func(p *Preferences) { p.DateFormat = m.o.preferences.DateFormat })
+			return m, nil
+		case "H":
+			m.o.preferences.ClockFormat = cycle([]string{"24h", "12h"}, m.o.preferences.ClockFormat)
+			m.savePreference(func(p *Preferences) { p.ClockFormat = m.o.preferences.ClockFormat })
+			return m, nil
 		case "j", "down":
 			if m.cursor < len(m.rows())-1 {
 				m.cursor++
@@ -531,6 +580,10 @@ func (m model) rows() []Row {
 		rows = filtered(m.s.Sections["session"], m.agent, m.modelFilter)
 	}
 	rows = append([]Row(nil), rows...)
+	if m.view == 2 || m.view == 4 {
+		sortRows(rows, m.tabSort())
+		return rows
+	}
 	sort.SliceStable(rows, func(i, j int) bool {
 		if m.sortMode == 2 {
 			return rows[i].Name < rows[j].Name
@@ -616,7 +669,7 @@ func (m model) compactView() string {
 	headerExtra++
 	fresh := "not loaded"
 	if !m.s.Loaded.IsZero() {
-		fresh = "snapshot " + m.s.Loaded.Local().Format("Jan 02 15:04:05")
+		fresh = "snapshot " + m.formatTimestamp(m.s.Loaded)
 		if m.cached {
 			fresh = "cached " + fresh
 		}
@@ -654,14 +707,18 @@ func (m model) compactView() string {
 	if f == "" {
 		f = "all"
 	}
-	b.WriteString(muted.Render(clip("Agent: "+safe(a)+"   Model: "+safe(f)+"   Group: "+m.o.Group, w)) + "\n")
+	filterLabel := "Agent: " + safe(a) + "   Model: " + safe(f) + "   Group: " + m.o.Group
+	if m.view == 2 || m.view == 4 {
+		filterLabel = "[s] " + m.sortLabel() + " · " + filterLabel
+	}
+	b.WriteString(muted.Render(clip(filterLabel, w)) + "\n")
 	b.WriteString(muted.Render(strings.Repeat("─", w)) + "\n")
 	if m.info != "" {
 		b.WriteString("DATA AVAILABILITY\n\n" + m.info + "\n\nesc close")
 	} else if m.exporting {
 		b.WriteString("EXPORT FILTERED VIEW\n\n1 JSON    2 CSV    3 SVG    4 PNG\n\nesc cancel")
 	} else if m.help {
-		b.WriteString(bright.Render("Make it yours") + "\n\nCtrl+T      Choose theme (" + themeLabel(m.o.Theme) + ")\n1–5 / tab   Overview, agents, models, tokens, sessions\nd / w / m   Change grouping instantly\na           Cycle agent filter\nf           Cycle model filter (independent of agent)\nx           Clear filters\nc           Toggle estimated cost / tokens\ns           Sort descending, ascending, or by name\n↑ ↓ / j k   Select row; home/end jump\nenter       Inspect selected row; esc closes\nt           Edit range: two dates, month, or last N\nr           Refresh snapshot (asynchronous)\nq / ctrl+c  Quit\n\nCost estimates use ccusage pricing, never subscription balance.")
+		b.WriteString(m.helpText())
 	} else if m.editing != "" {
 		b.WriteString(bright.Render("Change date range") + "\n\n" + m.input.View() + "\n\n" + muted.Render("YYYY-MM-DD YYYY-MM-DD · * for open bound\nmonth · last N (uses current grouping)\nenter apply · esc cancel"))
 		if m.err != "" {
@@ -673,7 +730,7 @@ func (m model) compactView() string {
 		rows := m.rows()
 		if len(rows) > 0 {
 			r := rows[min(m.cursor, len(rows)-1)]
-			b.WriteString(bright.Render(clip(safe(r.Name), w)) + "\n\n")
+			b.WriteString(bright.Render(clip(safe(r.Name), w)) + "\n" + m.sessionTimes(r) + "\n")
 			for _, v := range []struct {
 				label string
 				v     Metric
@@ -695,7 +752,7 @@ func (m model) compactView() string {
 				}
 				sort.Strings(keys)
 				for _, k := range keys {
-					b.WriteString("\n" + muted.Render(clip(safe(k+": "+string(r.Metadata[k])), w)))
+					b.WriteString("\n" + muted.Render(clip(safe(k+": "+m.metadataValue(r, k)), w)))
 				}
 			}
 			b.WriteString("\n\n" + muted.Render("esc / enter close · ↑ ↓ inspect another row"))
@@ -706,7 +763,7 @@ func (m model) compactView() string {
 		if m.cost && m.view != 3 {
 			metricLabel = "EST. " + m.fx.Currency
 		}
-		order := []string{"largest first", "smallest first", "name"}[m.sortMode]
+		order := m.sortLabel()
 		heading := views[m.view]
 		if m.view == 0 {
 			heading = "Activity · " + m.o.Group
@@ -776,7 +833,7 @@ func (m model) compactView() string {
 			}
 		}
 	}
-	footer := muted.Render("Ctrl+T themes  ? help  q quit  1–5 views  c metric  t range  r refresh")
+	footer := muted.Render("s sort  D date  H clock  ? help  q quit")
 	content := b.String()
 	lines := strings.Split(content, "\n")
 	maxLines := m.height - 4

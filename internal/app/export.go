@@ -27,15 +27,17 @@ type exportedMsg struct {
 	err  error
 }
 type exportRow struct {
-	Name       string `json:"name"`
-	Agent      string `json:"agent,omitempty"`
-	Tokens     any    `json:"tokens"`
-	CostUSD    any    `json:"estimated_cost_usd"`
-	Cost       any    `json:"estimated_cost"`
-	Input      any    `json:"input_tokens"`
-	Output     any    `json:"output_tokens"`
-	CacheRead  any    `json:"cache_read_tokens"`
-	CacheWrite any    `json:"cache_write_tokens"`
+	FirstActivity string `json:"first_activity,omitempty"`
+	LastActivity  string `json:"last_activity,omitempty"`
+	Name          string `json:"name"`
+	Agent         string `json:"agent,omitempty"`
+	Tokens        any    `json:"tokens"`
+	CostUSD       any    `json:"estimated_cost_usd"`
+	Cost          any    `json:"estimated_cost"`
+	Input         any    `json:"input_tokens"`
+	Output        any    `json:"output_tokens"`
+	CacheRead     any    `json:"cache_read_tokens"`
+	CacheWrite    any    `json:"cache_write_tokens"`
 }
 
 func jsonMetric(v Metric, rate float64) any {
@@ -62,13 +64,19 @@ func (m model) writeExport(kind string) (string, error) {
 		out := []exportRow{}
 		for _, r := range rows {
 			u := r.Usage
-			out = append(out, exportRow{r.Name, r.Agent, jsonMetric(u.Tokens, 1), jsonMetric(u.Cost, 1), jsonMetric(u.Cost, m.fx.Rate), jsonMetric(u.Input, 1), jsonMetric(u.Output, 1), jsonMetric(u.Read, 1), jsonMetric(u.Write, 1)})
+			out = append(out, exportRow{
+				FirstActivity: machineTimestamp(r.firstActivity), LastActivity: machineTimestamp(r.lastActivity),
+				Name: r.Name, Agent: r.Agent, Tokens: jsonMetric(u.Tokens, 1),
+				CostUSD: jsonMetric(u.Cost, 1), Cost: jsonMetric(u.Cost, m.fx.Rate),
+				Input: jsonMetric(u.Input, 1), Output: jsonMetric(u.Output, 1),
+				CacheRead: jsonMetric(u.Read, 1), CacheWrite: jsonMetric(u.Write, 1),
+			})
 		}
 		data, e = json.MarshalIndent(map[string]any{"view": views[m.view], "grouping": m.o.Group, "range": m.o.Range, "timezone": m.o.TZ, "agent_filter": m.agent, "model_filter": m.modelFilter, "currency": m.fx.Currency, "exchange_rate": m.fx.Rate, "exchange_date": m.fx.Date, "exchange_source": m.fx.Source, "snapshot_time": m.s.Loaded, "price_source": m.s.PriceSource, "price_date": m.s.PriceDate, "unpriced_models": m.s.Unpriced, "demo": m.o.Demo, "rows": out}, "", "  ")
 	case "csv":
 		var b bytes.Buffer
 		cw := csv.NewWriter(&b)
-		_ = cw.Write([]string{"name", "agent", "tokens", "tokens_partial", "estimated_cost_usd", "estimated_cost", "currency", "cost_partial", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "exchange_rate", "exchange_date", "since", "until", "timezone"})
+		_ = cw.Write([]string{"name", "agent", "tokens", "tokens_partial", "estimated_cost_usd", "estimated_cost", "currency", "cost_partial", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "exchange_rate", "exchange_date", "since", "until", "timezone", "first_activity", "last_activity", "snapshot_time", "price_date"})
 		metric := func(v Metric, rate float64) string {
 			if !v.Known {
 				return ""
@@ -77,7 +85,7 @@ func (m model) writeExport(kind string) (string, error) {
 		}
 		for _, r := range rows {
 			u := r.Usage
-			_ = cw.Write([]string{csvSafe(r.Name), csvSafe(r.Agent), metric(u.Tokens, 1), fmt.Sprint(u.Tokens.Partial), metric(u.Cost, 1), metric(u.Cost, m.fx.Rate), m.fx.Currency, fmt.Sprint(u.Cost.Partial), metric(u.Input, 1), metric(u.Output, 1), metric(u.Read, 1), metric(u.Write, 1), fmt.Sprint(m.fx.Rate), m.fx.Date, m.o.Range.Since, m.o.Range.Until, m.o.TZ})
+			_ = cw.Write([]string{csvSafe(r.Name), csvSafe(r.Agent), metric(u.Tokens, 1), fmt.Sprint(u.Tokens.Partial), metric(u.Cost, 1), metric(u.Cost, m.fx.Rate), m.fx.Currency, fmt.Sprint(u.Cost.Partial), metric(u.Input, 1), metric(u.Output, 1), metric(u.Read, 1), metric(u.Write, 1), fmt.Sprint(m.fx.Rate), m.fx.Date, m.o.Range.Since, m.o.Range.Until, m.o.TZ, machineTimestamp(r.firstActivity), machineTimestamp(r.lastActivity), machineTimestamp(m.s.Loaded), machineTimestamp(m.s.PriceDate)})
 		}
 		cw.Flush()
 		e = cw.Error()
