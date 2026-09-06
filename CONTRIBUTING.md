@@ -49,3 +49,11 @@ docs/
 ```
 
 Keep tests beside their packages, as is conventional in Go. Use a package's `testdata/` directory if file-based fixtures are needed. The date package has no UI or backend dependencies. The app package owns orchestration and presentation; split providers or persistent indexing into additional internal packages when they gain an independent lifecycle. Avoid a public `pkg/` API until another project needs it.
+
+## Versioning and releases
+
+Use semantic versions starting at `0.1.0`. For every user-visible change, add a
+concise entry under **Unreleased** in [CHANGELOG.md](CHANGELOG.md). Release PRs
+update `Version` in `internal/app/version.go` and move those entries into a
+versioned changelog section. Follow [docs/releases.md](docs/releases.md) for bump
+rules, required checks, tagging, and publishing with `gh`.

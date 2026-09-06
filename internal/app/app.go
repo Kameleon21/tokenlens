@@ -15,6 +15,7 @@ import (
 )
 
 type Options struct {
+	ShowVersion                               bool
 	CacheTTL                                  time.Duration
 	Offline                                   bool
 	CacheDir                                  string
@@ -41,6 +42,7 @@ func options(args []string, now time.Time) (Options, error) {
 		args = args[1:]
 	}
 	f := flag.NewFlagSet("tokenlens", flag.ContinueOnError)
+	f.BoolVar(&o.ShowVersion, "version", false, "print the Tokenlens version and exit")
 	var since, until string
 	var last int
 	f.StringVar(&since, "since", "", "inclusive start: YYYY-MM-DD or YYYYMMDD")
@@ -68,6 +70,9 @@ func options(args []string, now time.Time) (Options, error) {
 	}
 	if f.NArg() > 0 {
 		return o, fmt.Errorf("unexpected argument %q", f.Arg(0))
+	}
+	if o.ShowVersion {
+		return o, nil
 	}
 	hasLast := false
 	f.Visit(func(v *flag.Flag) {
@@ -113,6 +118,10 @@ func Run(args []string) int {
 	if e != nil {
 		fmt.Fprintln(os.Stderr, e)
 		return 2
+	}
+	if o.ShowVersion {
+		fmt.Fprintln(os.Stdout, "tokenlens "+Version)
+		return 0
 	}
 	applyTheme(o.Theme)
 	ctx, cancel := context.WithCancel(context.Background())
