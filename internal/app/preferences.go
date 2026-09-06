@@ -9,12 +9,14 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 )
 
 // Preferences contains only choices deliberately remembered between sessions.
 type Preferences struct {
+	ExportDir      string `toml:"export_dir"`
 	DateFormat     string `toml:"date_format"`
 	ClockFormat    string `toml:"clock_format"`
 	SessionsSort   string `toml:"sessions_sort"`
@@ -28,7 +30,7 @@ type Preferences struct {
 }
 
 func defaultPreferences() Preferences {
-	return Preferences{DateFormat: "european", ClockFormat: "24h", SessionsSort: "cost_desc", ModelsSort: "cost_desc", Currency: "USD", Theme: "dark", Grouping: "daily", Display: "cost", Layout: "dashboard"}
+	return Preferences{ExportDir: "exports", DateFormat: "european", ClockFormat: "24h", SessionsSort: "cost_desc", ModelsSort: "cost_desc", Currency: "USD", Theme: "dark", Grouping: "daily", Display: "cost", Layout: "dashboard"}
 }
 
 func configPath() (string, error) {
@@ -56,6 +58,9 @@ func configPathFor(goos string, getenv func(string) string, home func() (string,
 }
 
 func (p Preferences) validate() error {
+	if strings.TrimSpace(p.ExportDir) == "" || strings.ContainsRune(p.ExportDir, 0) {
+		return fmt.Errorf("export_dir must be a nonempty path without NUL characters")
+	}
 	if !slices.Contains([]string{"european", "us", "iso"}, p.DateFormat) {
 		return fmt.Errorf("date_format must be european, us, or iso")
 	}

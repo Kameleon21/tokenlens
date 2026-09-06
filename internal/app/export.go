@@ -104,7 +104,7 @@ func (m model) writeExport(kind string) (string, error) {
 	if dir == "" {
 		dir = "exports"
 	}
-	dir, e = filepath.Abs(dir)
+	dir, e = resolveExportDir(dir)
 	if e != nil {
 		return "", e
 	}
