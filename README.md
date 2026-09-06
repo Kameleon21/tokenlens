@@ -21,6 +21,8 @@ tokenlens
 
 Make sure Go's binary directory (usually `~/go/bin`) is on your `PATH`.
 From a local checkout, use `go install .` or `go run .`.
+Run `tokenlens --version` to check your version. See the [changelog](CHANGELOG.md)
+and [release guide](docs/releases.md) for version history and release conventions.
 Tokenlens uses installed ccusage when available; otherwise Bun downloads and runs the pinned version automatically. The first download needs internet access.
 
 Try it without any usage logs or backend:
