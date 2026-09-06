@@ -70,7 +70,7 @@ func TestAllThemesFit(t *testing.T) {
 	m := fixtureModel()
 	m.o.Currency = "EUR"
 	m.fx = Exchange{Currency: "EUR", Rate: .86, Date: "2026-09-04", Source: "ECB via Frankfurter"}
-	for _, theme := range []string{"dark", "light", "ascii"} {
+	for _, theme := range themeNames {
 		applyTheme(theme)
 		m.o.Theme = theme
 		for _, wh := range [][2]int{{50, 16}, {80, 24}, {96, 32}, {160, 50}, {300, 80}} {

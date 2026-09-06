@@ -37,14 +37,11 @@ func pane(title, caption, body string, w, h int, focused bool) string {
 	}
 	c := borderColor
 	if focused {
-		c = lipgloss.Color("#80D8C3")
+		c = lipgloss.Color(paletteFor(activeTheme).accent)
 	}
 	return lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(c).Padding(0, 2).Render(fit(header+"\n\n"+body, inner, h-2))
 }
 func chip(s string, selected bool, c lipgloss.Color) string {
-	if activeTheme == "light" && c == lipgloss.Color("#80D8C3") {
-		c = lipgloss.Color("#087E70")
-	}
 	style := lipgloss.NewStyle().Padding(0, 1).Foreground(c)
 	if selected {
 		style = style.Background(surface).Bold(true)
@@ -82,7 +79,7 @@ func (m model) View() string {
 	}
 	head.WriteString(muted.Render(m.o.Range.String()+"  ·  "+m.o.TZ) + strings.Repeat(" ", max(2, w-len(m.o.Range.String()+"  ·  "+m.o.TZ)-ansi.StringWidth(fresh))) + muted.Render(fresh) + "\n")
 	head.WriteString(muted.Render(strings.Repeat("─", w)) + "\n")
-	filters := chip("All agents", m.agent == "", lipgloss.Color("#80D8C3"))
+	filters := chip("All agents", m.agent == "", lipgloss.Color(paletteFor(activeTheme).accent))
 	agentNames := names(m.s, "agent")
 	for _, a := range agentNames[1:] {
 		next := chip(safe(a), m.agent == a, color(a))
@@ -122,7 +119,7 @@ func (m model) View() string {
 	head.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, pane("ESTIMATED COST · "+m.fx.Currency, "", costBody, cardW, 7, false), "  ", pane("TOP CONSUMING AGENT", "", top, cardW, 7, false), "  ", pane("CACHE READ SHARE", "", cacheBody, w-2*cardW-4, 7, false)) + "\n")
 	tabs := []string{}
 	for i, title := range views {
-		tabs = append(tabs, chip(fmt.Sprintf("%d %s", i+1, title), i == m.view, lipgloss.Color("#80D8C3")))
+		tabs = append(tabs, chip(fmt.Sprintf("%d %s", i+1, title), i == m.view, lipgloss.Color(paletteFor(activeTheme).accent)))
 	}
 	head.WriteString(strings.Join(tabs, " ") + "\n")
 	fx := muted.Render("Native USD estimates · [c] cost / tokens · [s] sort")
@@ -172,7 +169,7 @@ func (m model) View() string {
 		}
 		body = row(order[0], order[1], topH) + "\n" + row(order[2], order[3], bottomH)
 	}
-	footer := muted.Render("[ / ] widgets  enter open  v layout  e currency  T theme  p preset  b plan  o export  c metric  ? help  q quit")
+	footer := muted.Render("T " + themeLabel(m.o.Theme) + "  [ / ] widgets  enter open  v layout  e currency  p preset  b plan  o export  c metric  ? help  q quit")
 	content := fit(prefix+body, w, h-1) + "\n" + fit(footer, w, 1)
 	return themeRender(lipgloss.NewStyle().Foreground(ink).Padding(1, 2).Render(content), m.o.Theme, m.width, m.height)
 }
@@ -247,7 +244,7 @@ func (m model) bars(rows []Row, w, h int, selected bool) string {
 		}
 		c := color(r.Agent)
 		if r.Agent == "all" {
-			c = lipgloss.Color("#80D8C3")
+			c = lipgloss.Color(paletteFor(activeTheme).accent)
 		} else if r.Agent == "" {
 			c = color(r.Name)
 		}

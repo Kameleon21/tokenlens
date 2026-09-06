@@ -56,7 +56,7 @@ Sleep 2s
 Escape
 
 # Return to the original dashboard for a clean loop.
-Type "TT"
+Type "TTTTTTTT"
 Type "eeed"
 Sleep 3s
 Hide
