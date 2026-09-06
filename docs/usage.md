@@ -42,7 +42,16 @@ Settings are per run. To keep a default display currency, add `export TOKENLENS_
 
 Dates accept valid **YYYYMMDD** or **YYYY-MM-DD**, inclusive. With no range flags, the range is the current calendar month. A single explicit bound remains open on the other side. `--last N` includes the current day/week/month, ends today, and cannot combine with date bounds. Weeks begin Monday.
 
-Grouping changes preserve the range. The timezone defaults to UTC, or `TZ` when set; `--timezone` controls both backend filtering and calendar resolution. IANA timezone data is embedded.
+Grouping changes preserve the range. The timezone defaults to your system timezone (for example, `Europe/Dublin`).
+`TZ` overrides the system default, and `--timezone` overrides both. The same
+IANA timezone controls calendar ranges, billing presets, backend filtering and
+grouping, and snapshot cache separation, including daylight-saving transitions.
+The selected timezone is shown beside the date range. IANA timezone data is embedded.
+
+On macOS/Linux, Tokenlens reads the system timezone configuration. Where the
+IANA name is not available there (including Windows), it asks the installed
+Node.js or Bun runtime for the system timezone, without network access. If it
+cannot resolve a name, set `--timezone Europe/Dublin` or another IANA timezone.
 
 The billing preset uses `--billing-day` (default 1), clamped for shorter months, through today. “Since August 1” uses the most recent August 1. `--plan-cost` is your manually configured monthly plan amount in the startup currency; use `--plan-agent` to scope it to the covered agent. Press `b` to compare selected-range API-equivalent usage with that amount. This is **not money saved, subscription credit, an invoice, or proof that every recorded call was included in the plan**. Choose a matching billing range and filter for a meaningful comparison. Changing currency temporarily disables comparison until the configured plan currency is selected again.
 

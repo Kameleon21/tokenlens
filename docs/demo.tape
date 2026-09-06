@@ -18,7 +18,7 @@ Env COLORTERM "truecolor"
 
 # Start on a populated overview; all usage and exchange rates are synthetic.
 Hide
-Type "./bin/tokenlens --demo --no-cache --currency EUR --since 20260901 --until 20260930"
+Type "./bin/tokenlens --demo --no-cache --timezone UTC --currency EUR --since 20260901 --until 20260930"
 Enter
 Wait+Screen /synthetic demo rate/
 Sleep 500ms
