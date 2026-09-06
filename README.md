@@ -112,3 +112,5 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, checks, and pull request guid
 ## License
 
 [MIT](LICENSE).
+
+Powered by [ccusage](https://github.com/ccusage/ccusage), created by [ryoppippi](https://github.com/ryoppippi) and distributed under the [MIT license](third_party/ccusage-LICENSE).
