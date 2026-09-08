@@ -49,7 +49,7 @@ func themeLabel(name string) string {
 
 // themeIndicator stays visible above the content, including in compact terminals.
 func (m model) themeIndicator() string {
-	return accent.Bold(true).Render("Theme: "+themeLabel(m.o.Theme)) + muted.Render("  Ctrl+T choose")
+	return accent.Bold(true).Render("Theme: "+themeLabel(m.o.Theme)) + muted.Render("  Shift+T choose")
 }
 
 func applyTheme(name string) {

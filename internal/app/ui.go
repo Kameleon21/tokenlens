@@ -36,6 +36,9 @@ type exchangeMsg struct {
 	id       int
 }
 type model struct {
+	compareSelected, compareDate          string
+	comparing, compareWeekday             bool
+	compareOffset                         int
 	helpOffset                            int
 	displayLocation                       *time.Location
 	prices                                priceCatalog
@@ -208,7 +211,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case tea.MouseMsg:
-		if m.choosingTheme || m.help {
+		if m.choosingTheme || m.help || m.comparing {
 			return m, nil
 		}
 		if m.view == 0 && !m.activityDetail && !m.details && m.width >= 96 && m.height >= 32 && m.layout == 0 && v.Y >= 19 && v.Y < 16+(m.height-20)/2-1 && v.X >= 5 && v.X < (m.width-4)/2 {
@@ -312,9 +315,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		if m.editing != "" {
 			if key == "esc" {
+				if m.editing == "comparison" {
+					m.err = ""
+				}
 				m.editing = ""
 				m.input.Blur()
 				return m, nil
+			}
+			if key == "enter" && m.editing == "comparison" {
+				return m.applyComparisonDates()
 			}
 			if key == "enter" {
 				parts := strings.Fields(m.input.Value())
@@ -371,6 +380,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.help = false
 				return m, nil
 			}
+			if m.comparing {
+				m.comparing = false
+				return m, nil
+			}
 			m.details = false
 			m.info = ""
 			m.activityDetail = false
@@ -383,7 +396,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.helpOffset = 0
 			return m, nil
 		}
-		if key == "ctrl+t" || key == "T" {
+		if key == "T" {
 			cmd := m.openThemePicker()
 			return m, cmd
 		}
@@ -401,7 +414,60 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.helpOffset = max(0, min(m.helpOffset, max(0, len(strings.Split(m.helpText(), "\n"))-1)))
 			return m, nil
 		}
+		if m.comparing {
+			switch key {
+			case "pgdown", "pgup":
+				step := 5
+				if key == "pgup" {
+					step = -step
+				}
+				m.compareOffset = max(0, min(len(m.comparisonLines(max(1, m.width-10)))-1, m.compareOffset+step))
+				return m, nil
+			case "up", "down", "j", "k", "home", "end":
+				for i, r := range m.rows() {
+					if r.Name == m.compareSelected {
+						m.cursor = i
+						break
+					}
+				}
+				m.compareSelected = ""
+				m.compareOffset = 0
+			case "a", "f", "x", "C":
+				m.compareOffset = 0
+			}
+			switch key {
+			case "1", "2", "3", "4", "5", "tab", "shift+tab", "d", "w", "m":
+				m.comparing = false
+			}
+		}
 		switch key {
+		case "C":
+			if m.view != 0 || m.o.Group != "daily" {
+				return m, nil
+			}
+			if m.comparing {
+				m.compareWeekday = !m.compareWeekday
+				m.compareDate = ""
+			} else {
+				m.compareSelected, m.compareDate = "", ""
+				m.compareWeekday = false
+				if !m.activityDetail && !m.details && m.width >= 96 && m.height >= 32 {
+					periods := m.chartPeriods()
+					if len(periods) > 0 {
+						selected := periods[min(m.dayCursor, len(periods)-1)].Name
+						for i, r := range m.rows() {
+							if r.Name == selected {
+								m.cursor = i
+								break
+							}
+						}
+					}
+				}
+				m.comparing = true
+				m.compareSelected = m.comparisonSelected().Name
+			}
+			m.compareOffset = 0
+			return m, nil
 		case "1", "2", "3", "4", "5":
 			m.view = int(key[0] - '1')
 			m.activityDetail = false
@@ -550,11 +616,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, m.refresh(r, true)
 		case "t":
+			if m.comparing {
+				m.editing = "comparison"
+				selected := m.comparisonSelected().Name
+				if selected == "" {
+					selected = m.compareSelected
+				}
+				if selected == "" {
+					selected = time.Now().Format("2006-01-02")
+				}
+				_, baseline, _ := m.comparisonBaseline(selected)
+				m.input.SetValue(baseline + " to " + selected)
+				m.input.Focus()
+				return m, textinput.Blink
+			}
 			m.editing = "range"
 			m.input.SetValue(m.rangeInput())
 			m.input.Focus()
 			return m, textinput.Blink
 		}
+	}
+	if m.comparing && m.compareSelected == "" {
+		m.compareSelected = m.comparisonSelected().Name
 	}
 	var cmd tea.Cmd
 	if m.choosingTheme {
@@ -658,6 +741,9 @@ func (m model) compactView() string {
 	if m.width < 50 || m.height < 16 {
 		return "Tokenlens\n\nResize to at least 50 × 16 for the dashboard.\nq quit"
 	}
+	if m.comparing && !m.help && !m.exporting && m.info == "" && (m.err == "" || m.editing == "comparison") {
+		return m.compactComparisonView()
+	}
 	w := m.width - 4
 	headerExtra := 0
 	var b strings.Builder
@@ -734,12 +820,15 @@ func (m model) compactView() string {
 	} else if m.exporting {
 		b.WriteString("EXPORT FILTERED VIEW\n\n1 JSON    2 CSV    3 SVG    4 PNG\n\nesc cancel")
 	} else if m.editing != "" {
-		b.WriteString(bright.Render("Change date range") + "\n\n" + m.input.View() + "\n\n" + muted.Render(m.rangeHelp()+"\nenter apply · esc cancel"))
+		b.WriteString(bright.Render(m.dateEditorTitle()) + "\n\n" + m.input.View() + "\n\n" + muted.Render(m.dateEditorHelp()+"\nenter apply · esc cancel"))
 		if m.err != "" {
 			b.WriteString("\n\n" + safe(m.err))
 		}
 	} else if m.err != "" {
 		b.WriteString(bright.Render("Could not refresh") + "\n\n" + lipgloss.NewStyle().Width(w).Render(safe(m.err)) + "\n\n" + muted.Render("r retry · t change range · esc return to previous snapshot"))
+	} else if m.comparing {
+		slots := max(1, m.height-4-lipgloss.Height(b.String()))
+		b.WriteString(m.comparisonContent(w, slots))
 	} else if m.details {
 		rows := m.rows()
 		if len(rows) > 0 {
@@ -848,10 +937,16 @@ func (m model) compactView() string {
 		}
 	}
 	footer := muted.Render("s sort  D date  H clock  ? help  q quit")
+	if m.view == 0 && m.o.Group == "daily" {
+		footer = muted.Render("Shift+C compare · s sort · ? help · q quit")
+	}
 	if m.help {
 		footer = muted.Render("CONTROLS · ↑ ↓ scroll · home/end · esc close")
 	}
 	content := b.String()
+	if m.comparing && !m.help {
+		footer = muted.Render("t dates · C baseline · PgUp/Dn · ↑↓ · esc")
+	}
 	lines := strings.Split(content, "\n")
 	maxLines := m.height - 4
 	if len(lines) > maxLines {

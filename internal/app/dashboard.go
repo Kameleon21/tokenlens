@@ -145,13 +145,15 @@ func (m model) dashboardView() string {
 	case m.exporting:
 		body = pane("EXPORT FILTERED VIEW", "esc cancel", "[1] JSON · complete metrics and currency metadata\n[2] CSV · spreadsheet-ready values\n[3] SVG · vector chart\n[4] PNG · chart image\n\nExports use the selected range, filters, grouping and currency.\nDirectory: "+safe(m.o.ExportDir), w, bodyH, true)
 	case m.editing != "":
-		body = pane("DATE RANGE", "enter apply · esc cancel", m.input.View()+"\n\n"+muted.Render(m.rangeHelp())+"\n\n"+safe(m.err), w, bodyH, true)
+		body = pane(m.dateEditorTitle(), "enter apply · esc cancel", m.input.View()+"\n\n"+muted.Render(m.dateEditorHelp())+"\n\n"+safe(m.err), w, bodyH, true)
 	case m.err != "":
 		msg := safe(m.err)
 		if strings.Contains(m.err, "not installed") {
 			msg = "Tokenlens needs ccusage to read your local usage.\n\nInstall Bun for automatic ccusage launch, or install ccusage:\n  npm install -g ccusage@20.0.20\n\nThen press r here to retry, or restart with:\n  go run . --currency " + m.o.Currency + "\n\nTo explore with sample data only:\n  go run . --demo --currency " + m.o.Currency
 		}
 		body = pane("CONNECT YOUR USAGE", "r retry · esc dismiss", msg, w, bodyH, true)
+	case m.comparing:
+		body = pane("Compare day", "t dates · Shift+C baseline · PgUp/PgDn · ↑↓ day · esc", m.comparisonContent(w-6, bodyH-4), w, bodyH, true)
 	case m.view != 0 || m.activityDetail || m.details:
 		body = m.drilldown(w, bodyH)
 	default:
@@ -164,13 +166,16 @@ func (m model) dashboardView() string {
 		if m.layout == 1 {
 			order = []int{3, 0, 1, 2}
 		}
-		captions := []string{"← → inspect · enter open", "3 · models", "5 · sessions", "d / w / m · periods"}
+		captions := []string{"← → inspect · Shift+C compare · enter open", "3 · models", "5 · sessions", "d / w / m · periods"}
 		row := func(a, b, height int) string {
 			return lipgloss.JoinHorizontal(lipgloss.Top, pane(titles[a], captions[a], contents[a], cw, height, m.widget == a), "  ", pane(titles[b], captions[b], contents[b], w-cw-2, height, m.widget == b))
 		}
 		body = row(order[0], order[1], topH) + "\n" + row(order[2], order[3], bottomH)
 	}
-	footer := muted.Render("Ctrl+T themes  [ / ] widgets  enter open  v layout  e currency  p preset  b plan  o export  c metric  ? help  q quit")
+	footer := muted.Render("Shift+T themes  [ / ] widgets  enter open  v layout  e currency  p preset  b plan  o export  c metric  ? help  q quit")
+	if m.comparing {
+		footer = muted.Render("t choose dates · Shift+C baseline · PgUp/PgDn scroll · ↑↓ day · esc back · Shift+T themes")
+	}
 	if m.help {
 		footer = muted.Render("↑ ↓ scroll · home/end · esc close · ? close · q quit")
 	}
@@ -471,11 +476,15 @@ func (m model) drilldown(w, h int) string {
 	if m.view == 3 {
 		details = m.cacheChart(rightW-6, h-4)
 	}
+	inspectorCaption := "↑ ↓ select · esc back"
+	if m.view == 0 && m.o.Group == "daily" {
+		inspectorCaption = "↑ ↓ select · Shift+C compare · esc back"
+	}
 	caption := "[s] " + m.sortLabel()
-	return lipgloss.JoinHorizontal(lipgloss.Top, pane(title, "", muted.Render(caption)+"\n"+m.bars(rows, leftW-6, h-5, true), leftW, h, true), "  ", pane("Inspector", "↑ ↓ select · esc back", details, rightW, h, false))
+	return lipgloss.JoinHorizontal(lipgloss.Top, pane(title, "", muted.Render(caption)+"\n"+m.bars(rows, leftW-6, h-5, true), leftW, h, true), "  ", pane("Inspector", inspectorCaption, details, rightW, h, false))
 }
 func (m model) helpText() string {
-	return m.displayHelp() + "\n\n1–5 / tab     Overview, agents, models, tokens/cache, sessions\nd / w / m     Daily, weekly, monthly grouping\na / f         Cycle agent / model filter independently\nx             Clear both filters\nc / s         Cost or tokens / sorting order\n[ / ]         Focus overview widget\nenter         Open focused widget or inspect a row\nv             Switch overview layout\ne / ctrl+t    Currency / searchable theme picker\nn             Compact k/M/B token labels (inspector stays exact)\np / b         Date preset / configured plan comparison\no             Export filtered JSON, CSV, SVG, PNG\n← → / hover   Inspect daily stacked bars\nh             Explain unavailable hourly / 5-hour data\n↑ ↓ / j k     Select rows; home/end jump\nt             Edit date range\nr             Refresh usage; exchange rate after 24h\nq / ctrl+c    Quit\n\n" + m.exchangeStatus() + "\n\nCost is estimated. Cache savings and spend changes require additional data."
+	return m.displayHelp() + "\n\n1–5 / tab     Overview, agents, models, tokens/cache, sessions\nd / w / m     Daily, weekly, monthly grouping\na / f         Cycle agent / model filter independently\nx             Clear both filters\nc / s         Cost or tokens / sorting order\n[ / ]         Focus overview widget\nenter         Open focused widget or inspect a row\nShift+C       Compare daily period / switch baseline\nPgUp/PgDn     Scroll daily comparison\nt (compare)   Choose baseline and selected dates\nv             Switch overview layout\ne / Shift+T    Currency / searchable theme picker\nn             Compact k/M/B token labels (inspector stays exact)\np / b         Date preset / configured plan comparison\no             Export filtered JSON, CSV, SVG, PNG\n← → / hover   Inspect daily stacked bars\nh             Explain unavailable hourly / 5-hour data\n↑ ↓ / j k     Select rows; home/end jump\nt             Edit date range\nr             Refresh usage; exchange rate after 24h\nq / ctrl+c    Quit\n\n" + m.exchangeStatus() + "\n\nCost is estimated. Cache savings require additional data."
 }
 
 func (m model) helpContent(height int) string {
