@@ -5,6 +5,16 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+## [0.6.0] - 2026-09-08
+
+### Added
+
+- Compare a selected daily period with the previous day or the same weekday last week using Shift+C, or choose any two dates with t. Inspect exact cost/token values and signed changes with filters preserved, scrollable at compact terminal sizes.
+
+### Changed
+
+- The theme picker opens only with Shift+T. Migration: replace Ctrl+T with Shift+T; Ctrl+T is now unbound so terminal tools such as tmux can use it.
+
 ## [0.5.2] - 2026-09-06
 
 ### Fixed
@@ -115,3 +125,5 @@ User-visible changes are recorded here. Versions follow the conventions in
 [0.5.1]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.5.1
 
 [0.5.2]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.5.2
+
+[0.6.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.6.0

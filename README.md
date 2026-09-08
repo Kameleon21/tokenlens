@@ -61,7 +61,7 @@ tokenlens --demo
 tokenlens --currency EUR
 tokenlens weekly --last 8
 tokenlens --since 2026-08-01 --until 2026-08-31
-tokenlens --theme nord  # Ctrl+T opens the theme picker
+tokenlens --theme nord  # Shift+T opens the theme picker
 ```
 
 The default date range is this calendar month. Dates are inclusive. Tokenlens uses your system timezone by default. `TZ` overrides it, and `--timezone` takes priority over both.
@@ -79,11 +79,12 @@ See [saved preferences](docs/usage.md#saved-preferences) for all settings and Wi
 | `a` / `f` / `x` | Filter agent, filter model, clear filters |
 | `t` / `p` | Enter dates / cycle date presets |
 | `c` / `e` | Switch cost/token view / currency |
+| `Shift+C` | Compare daily period; `t` chooses any two dates |
 | `s` | Cycle sort order; Models and Sessions remember their own choice |
 | `Shift+D` / `Shift+H` | Date format / 12- or 24-hour clock (saved) |
 | `r` | Fetch a fresh report |
 | `o` | Export JSON, CSV, SVG, or PNG |
-| `Ctrl+T` | Search and preview themes |
+| `Shift+T` | Search and preview themes |
 | `?` / `q` | All controls / quit |
 
 ## Loading speed

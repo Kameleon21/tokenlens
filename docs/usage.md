@@ -21,6 +21,8 @@ All available agent and model names are discovered dynamically. Agent and model 
 | `←` / `→`, mouse over stacked chart | Inspect a period |
 | `[` / `]`, `enter` | Focus / open overview widget |
 | `v` | Switch grid layout |
+| `Shift+C` | Compare selected daily period; cycle baseline |
+| `PgUp` / `PgDn` | Scroll daily comparison |
 | `↑` / `↓`, `j` / `k`, `home` / `end` | Navigate ranked rows |
 | `a` / `f`, `x` | Cycle agent / model filter; clear filters |
 | `n` | Toggle compact k/M/B token labels (inspector remains exact) |
@@ -28,7 +30,7 @@ All available agent and model names are discovered dynamically. Agent and model 
 | `s` | Cycle the current tab's sort; Sessions/Models remember independent choices |
 | `Shift+D` / `Shift+H` | Cycle date format / toggle 12- or 24-hour clock; saved automatically |
 | `e` | Cycle USD, EUR, GBP, JPY |
-| `Ctrl+T` | Open searchable theme popup (Shift+T also opens it) |
+| `Shift+T` | Open searchable theme popup |
 | `t` | Edit dates: two dates, `month`, or `last N` |
 | `p` | Calendar month → billing cycle → last 30 days → since August 1 |
 | `b` | Toggle configured subscription-plan comparison |
@@ -39,6 +41,35 @@ All available agent and model names are discovered dynamically. Agent and model 
 | `q` / `ctrl+c` | Quit |
 
 Display choices are saved in your [configuration file](#saved-preferences). `TOKENLENS_CURRENCY` overrides saved currency, and `--currency` overrides both.
+
+## Daily period comparison
+
+In Overview with daily grouping, select a chart bar with Left/Right (or a row
+in the compact/activity view), then press `Shift+C`. The inspector shows the
+selected day against the previous calendar day; press `Shift+C` again to switch
+to the same weekday last week. Press `t` to enter **baseline to selected** dates
+(for example, `2026-08-12 to 2026-09-07`); either date may come first.
+Up/Down selects another day in the current row
+sort order, Page Up/Down scrolls the comparison, and Escape returns to the
+underlying view. Weekly/monthly and other tabs do not use this shortcut.
+
+Estimated cost, total tokens, input, output, cache read and cache write show
+before/after values and signed absolute and percentage changes. Existing agent
+and model filters apply to both days. Exact token values remain visible even
+with compact labels enabled. Both days use the same loaded snapshot and display
+exchange rate. Preset switching uses the loaded report. Applying custom dates
+within that range is local; dates outside it expand the report range and load
+through the normal asynchronous report/cache flow. Both dates are kept selected
+after the refresh.
+
+A missing baseline (including a day absent after filtering) is unavailable,
+never assumed to be zero. Choose custom dates with `t` to expand the range if necessary. Unknown
+or partial metrics retain their reported values but have no calculated change.
+A known zero baseline shows “from zero” instead of an infinite percentage.
+The current day is marked incomplete; daily reports cannot compare matching
+hours. Costs remain API-equivalent estimates, not subscription charges.
+
+![Daily period comparison with synthetic data](assets/daily-comparison.png)
 
 ## Sessions and Models sorting
 
@@ -158,11 +189,10 @@ Press `o`, then choose JSON, CSV, SVG, or PNG. Files go into `./exports` by defa
 
 ### Themes
 
-Press `Ctrl+T` to open the centered theme picker. Type a name or a fuzzy query
+Press `Shift+T` to open the centered theme picker. Type a name or a fuzzy query
 such as `tnd` for Tokyo Night Dark. Use Up/Down, Ctrl+N/Ctrl+P, or Tab/Shift+Tab
 to preview matches live on the dashboard. Enter applies the selection; Escape
-restores the theme you had before opening the popup. Shift+T remains an alias
-for opening the picker. While searching, letter keys enter text rather than
+restores the theme you had before opening the popup. Ctrl+T is left unbound for terminal tools such as tmux. While searching, letter keys enter text rather than
 triggering dashboard shortcuts.
 
 Choose from Dark, Light, ASCII, Nord, Gruvbox, Tokyo Night Light, Tokyo Night
@@ -195,7 +225,7 @@ and [Solarized](https://ethanschoonover.com/solarized/).
 ## Saved preferences
 
 Tokenlens remembers choices you apply inside the TUI: currency (`e`), theme
-(Ctrl+T then Enter), grouping (`d`/`w`/`m`), cost/token display (`c`), compact
+(Shift+T then Enter), grouping (`d`/`w`/`m`), cost/token display (`c`), compact
 numbers (`n`), overview layout (`v`), date format (`Shift+D`), clock (`Shift+H`),
 and separate Models/Sessions sort orders (`s` in each tab). Theme previews and Escape do not save.
 These preferences also apply to demo mode. Dates, filters, searches, and the

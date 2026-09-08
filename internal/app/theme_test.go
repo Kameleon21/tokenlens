@@ -16,7 +16,7 @@ func TestThemePickerApplyAndCancel(t *testing.T) {
 	m := fixtureModel()
 	m.o.Theme = "nord"
 	m.agent, m.view = "codex", 2
-	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyCtrlT})
+	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'T'}})
 	if !m.choosingTheme || m.o.Theme != "nord" {
 		t.Fatal("opening picker changed theme or failed")
 	}
@@ -28,7 +28,7 @@ func TestThemePickerApplyAndCancel(t *testing.T) {
 	if m.choosingTheme || m.o.Theme != "nord" || activeTheme != "nord" {
 		t.Fatal("cancel did not restore original theme")
 	}
-	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyCtrlT})
+	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'T'}})
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("solarized dark")})
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyEnter})
 	if m.choosingTheme || m.o.Theme != "solarized-dark" {
@@ -51,7 +51,7 @@ func TestThemePickerNavigationAndEmptyResults(t *testing.T) {
 	defer applyTheme("dark")
 	m := fixtureModel()
 	m.o.Theme = "dark"
-	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyCtrlT})
+	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'T'}})
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyUp})
 	if m.o.Theme != "solarized-dark" {
 		t.Fatal("up did not wrap")
@@ -76,7 +76,7 @@ func TestThemePickerNavigationAndEmptyResults(t *testing.T) {
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyEsc})
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'T'}})
 	if !m.choosingTheme {
-		t.Fatal("legacy shortcut did not open picker")
+		t.Fatal("Shift+T shortcut did not open picker")
 	}
 }
 
@@ -91,7 +91,7 @@ func TestThemePickerFits(t *testing.T) {
 			m.o.Theme = name
 			applyTheme(name)
 			m.width, m.height = wh[0], wh[1]
-			m = pickerKey(m, tea.KeyMsg{Type: tea.KeyCtrlT})
+			m = pickerKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'T'}})
 			for _, query := range []string{"", "no such theme"} {
 				m.themeQuery.SetValue(query)
 				m.themeCursor = 0
@@ -160,7 +160,7 @@ func TestThemeIndicatorVisibleAtTop(t *testing.T) {
 				m.view = view
 				lines := strings.Split(ansi.Strip(m.View()), "\n")
 				top := strings.Join(lines[:min(4, len(lines))], "\n")
-				if !strings.Contains(top, "Theme: "+themeLabel(name)) || !strings.Contains(top, "Ctrl+T choose") {
+				if !strings.Contains(top, "Theme: "+themeLabel(name)) || !strings.Contains(top, "Shift+T choose") {
 					t.Fatalf("missing visible theme indicator for %s at %v view %d: %s", name, wh, view, top)
 				}
 			}
