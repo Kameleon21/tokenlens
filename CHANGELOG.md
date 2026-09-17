@@ -5,6 +5,12 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+## [0.7.0] - 2026-09-17
+
+### Added
+
+- Press y in the Sessions list or details to copy the selected session’s full name to the local clipboard, with success/failure feedback in dashboard and compact layouts.
+
 ## [0.6.0] - 2026-09-08
 
 ### Added
@@ -127,3 +133,5 @@ User-visible changes are recorded here. Versions follow the conventions in
 [0.5.2]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.5.2
 
 [0.6.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.6.0
+
+[0.7.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.7.0
