@@ -27,6 +27,7 @@ All available agent and model names are discovered dynamically. Agent and model 
 | `a` / `f`, `x` | Cycle agent / model filter; clear filters |
 | `n` | Toggle compact k/M/B token labels (inspector remains exact) |
 | `c` | Toggle cost vs. tokens (does not change Sessions/Models sorting) |
+| `y` | Copy the selected session’s full name (Sessions list or details) |
 | `s` | Cycle the current tab's sort; Sessions/Models remember independent choices |
 | `Shift+D` / `Shift+H` | Cycle date format / toggle 12- or 24-hour clock; saved automatically |
 | `e` | Cycle USD, EUR, GBP, JPY |
@@ -70,6 +71,21 @@ The current day is marked incomplete; daily reports cannot compare matching
 hours. Costs remain API-equivalent estimates, not subscription charges.
 
 ![Daily period comparison with synthetic data](assets/daily-comparison.png)
+
+## Copy a session name
+
+Open **Sessions** (`5`), select a row with `↑` / `↓`, and press `y` to copy its
+full name, even if it is truncated on screen. The shortcut also works in session
+details. A status message confirms success or explains a clipboard failure;
+press `esc` to dismiss it.
+Names are copied exactly, without display formatting or an added newline.
+
+Copying uses the clipboard on the computer running Tokenlens: macOS uses
+`pbcopy`, Windows uses its native clipboard, and Linux requires `wl-clipboard`
+on Wayland or `xclip`/`xsel` on X11. A working desktop clipboard is required.
+SSH does not forward this action to your own computer’s clipboard.
+
+![Copying a session name with synthetic demo data](assets/sessions-copy.png)
 
 ## Sessions and Models sorting
 

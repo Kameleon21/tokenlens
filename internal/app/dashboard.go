@@ -131,7 +131,7 @@ func (m model) dashboardView() string {
 		fx += muted.Render(" · OFFLINE: cached ccusage pricing")
 	}
 	if m.notice != "" {
-		fx += muted.Render("  ·  " + m.notice)
+		fx = muted.Render(m.notice)
 	}
 	head.WriteString(clip(fx, w) + "\n")
 	prefix := head.String()
@@ -173,6 +173,9 @@ func (m model) dashboardView() string {
 		body = row(order[0], order[1], topH) + "\n" + row(order[2], order[3], bottomH)
 	}
 	footer := muted.Render("Shift+T themes  [ / ] widgets  enter open  v layout  e currency  p preset  b plan  o export  c metric  ? help  q quit")
+	if m.view == 4 {
+		footer = muted.Render("y Copy name · ↑ ↓ select · enter details · s sort · D date · H clock · ? help · q quit")
+	}
 	if m.comparing {
 		footer = muted.Render("t choose dates · Shift+C baseline · PgUp/PgDn scroll · ↑↓ day · esc back · Shift+T themes")
 	}
@@ -484,7 +487,7 @@ func (m model) drilldown(w, h int) string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, pane(title, "", muted.Render(caption)+"\n"+m.bars(rows, leftW-6, h-5, true), leftW, h, true), "  ", pane("Inspector", inspectorCaption, details, rightW, h, false))
 }
 func (m model) helpText() string {
-	return m.displayHelp() + "\n\n1–5 / tab     Overview, agents, models, tokens/cache, sessions\nd / w / m     Daily, weekly, monthly grouping\na / f         Cycle agent / model filter independently\nx             Clear both filters\nc / s         Cost or tokens / sorting order\n[ / ]         Focus overview widget\nenter         Open focused widget or inspect a row\nShift+C       Compare daily period / switch baseline\nPgUp/PgDn     Scroll daily comparison\nt (compare)   Choose baseline and selected dates\nv             Switch overview layout\ne / Shift+T    Currency / searchable theme picker\nn             Compact k/M/B token labels (inspector stays exact)\np / b         Date preset / configured plan comparison\no             Export filtered JSON, CSV, SVG, PNG\n← → / hover   Inspect daily stacked bars\nh             Explain unavailable hourly / 5-hour data\n↑ ↓ / j k     Select rows; home/end jump\nt             Edit date range\nr             Refresh usage; exchange rate after 24h\nq / ctrl+c    Quit\n\n" + m.exchangeStatus() + "\n\nCost is estimated. Cache savings require additional data."
+	return m.displayHelp() + "\n\n1–5 / tab     Overview, agents, models, tokens/cache, sessions\nd / w / m     Daily, weekly, monthly grouping\na / f         Cycle agent / model filter independently\nx             Clear both filters\nc / s         Cost or tokens / sorting order\n[ / ]         Focus overview widget\nenter         Open focused widget or inspect a row\nShift+C       Compare daily period / switch baseline\nPgUp/PgDn     Scroll daily comparison\nt (compare)   Choose baseline and selected dates\nv             Switch overview layout\ne / Shift+T    Currency / searchable theme picker\nn             Compact k/M/B token labels (inspector stays exact)\np / b         Date preset / configured plan comparison\no             Export filtered JSON, CSV, SVG, PNG\n← → / hover   Inspect daily stacked bars\nh             Explain unavailable hourly / 5-hour data\n↑ ↓ / j k     Select rows; home/end jump\ny (Sessions) Copy full session name to clipboard\nt             Edit date range\nr             Refresh usage; exchange rate after 24h\nq / ctrl+c    Quit\n\n" + m.exchangeStatus() + "\n\nCost is estimated. Cache savings require additional data."
 }
 
 func (m model) helpContent(height int) string {

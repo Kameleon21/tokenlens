@@ -36,6 +36,8 @@ type exchangeMsg struct {
 	id       int
 }
 type model struct {
+	copying                               bool
+	clipboardWrite                        func(context.Context, string) error
 	compareSelected, compareDate          string
 	comparing, compareWeekday             bool
 	compareOffset                         int
@@ -247,6 +249,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, m.refresh(v.r, true)
 		}
 		return m, nil
+	case copiedSessionMsg:
+		m.copying = false
+		if v.err != nil {
+			m.notice = "Copy failed: " + safe(v.err.Error())
+		} else {
+			m.notice = "Session name copied"
+		}
+		return m, nil
 	case exportedMsg:
 		if v.err != nil {
 			m.notice = "Export failed: " + v.err.Error()
@@ -386,6 +396,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			m.details = false
 			m.info = ""
+			m.notice = ""
 			m.activityDetail = false
 			m.help = false
 			m.err = ""
@@ -494,6 +505,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.o.Group = "monthly"
 			m.savePreference(func(p *Preferences) { p.Grouping = m.o.Group })
 			m.cursor = 0
+		case "y":
+			cmd := m.copySessionCmd()
+			return m, cmd
 		case "c":
 			m.cost = !m.cost
 			m.savePreference(func(p *Preferences) {
@@ -776,6 +790,9 @@ func (m model) compactView() string {
 	if m.loading {
 		fresh = m.spin.View() + " loading " + m.formatRange(m.pending) + " · " + fresh
 	}
+	if m.notice != "" {
+		fresh = m.notice
+	}
 	b.WriteString(muted.Render(clip(fresh, w)) + "\n")
 	if m.o.Currency != "USD" {
 		status := muted.Width(w).Render(m.exchangeStatus())
@@ -937,6 +954,9 @@ func (m model) compactView() string {
 		}
 	}
 	footer := muted.Render("s sort  D date  H clock  ? help  q quit")
+	if m.view == 4 {
+		footer = muted.Render("y Copy name · s sort · ? help · q quit")
+	}
 	if m.view == 0 && m.o.Group == "daily" {
 		footer = muted.Render("Shift+C compare · s sort · ? help · q quit")
 	}
