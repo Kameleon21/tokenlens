@@ -157,8 +157,9 @@ func emptyAll(s string) string {
 func (m model) exportSVG(rows []Row) string {
 	rows, peak := m.chartExportRows(rows)
 	height := 160 + len(rows)*44
+	p := paletteFor(m.o.Theme)
 	var b strings.Builder
-	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="%d" viewBox="0 0 1100 %d"><rect width="100%%" height="100%%" fill="#151d28"/><g font-family="monospace" fill="#e3e9f3"><text x="30" y="35" font-size="22">Tokenlens · %s</text><text x="30" y="62" font-size="12">%s</text>`, height, height, html.EscapeString(views[m.view]), html.EscapeString(m.exportSubtitle()))
+	fmt.Fprintf(&b, `<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="%d" viewBox="0 0 1100 %d"><rect width="100%%" height="100%%" fill="%s"/><g font-family="monospace" fill="%s"><text x="30" y="35" font-size="22">Tokenlens · %s</text><text x="30" y="62" font-size="12">%s</text>`, height, height, p.background, p.foreground, html.EscapeString(views[m.view]), html.EscapeString(m.exportSubtitle()))
 	for i, r := range rows {
 		y := 100 + i*44
 		v := m.value(r)
@@ -179,11 +180,12 @@ func (m model) exportSVG(rows []Row) string {
 func (m model) exportPNG(rows []Row) ([]byte, error) {
 	rows, peak := m.chartExportRows(rows)
 	height := 160 + len(rows)*44
+	p := paletteFor(m.o.Theme)
 	img := image.NewRGBA(image.Rect(0, 0, 1100, height))
-	draw.Draw(img, img.Bounds(), &image.Uniform{imgcolor.RGBA{21, 29, 40, 255}}, image.Point{}, draw.Src)
+	draw.Draw(img, img.Bounds(), &image.Uniform{hexRGBA(p.background)}, image.Point{}, draw.Src)
 	label := func(x, y int, s string) {
 		s = strings.NewReplacer("€", "EUR ", "£", "GBP ", "¥", "JPY ", "→", "to", "·", "|").Replace(s)
-		d := font.Drawer{Dst: img, Src: &image.Uniform{imgcolor.RGBA{227, 233, 243, 255}}, Face: basicfont.Face7x13, Dot: fixed.P(x, y)}
+		d := font.Drawer{Dst: img, Src: &image.Uniform{hexRGBA(p.foreground)}, Face: basicfont.Face7x13, Dot: fixed.P(x, y)}
 		d.DrawString(s)
 	}
 	label(30, 35, "TOKENLENS | "+views[m.view])
@@ -196,7 +198,7 @@ func (m model) exportPNG(rows []Row) ([]byte, error) {
 			width = int(v.Value / peak * 490)
 		}
 		label(30, y, clip(safe(m.rowLabel(r)), 42))
-		draw.Draw(img, image.Rect(360, y-12, 360+width, y+3), &image.Uniform{imgcolor.RGBA{128, 216, 195, 255}}, image.Point{}, draw.Src)
+		draw.Draw(img, image.Rect(360, y-12, 360+width, y+3), &image.Uniform{hexRGBA(string(colorFor(r.Name, m.o.Theme)))}, image.Point{}, draw.Src)
 		label(870, y, m.formatMetric(v, m.cost && m.view != 3))
 	}
 	note := m.exchangeLabel()
@@ -208,4 +210,13 @@ func (m model) exportPNG(rows []Row) ([]byte, error) {
 	var b bytes.Buffer
 	e := png.Encode(&b, img)
 	return b.Bytes(), e
+}
+
+// Palette entries are #RRGGBB; anything else falls back to opaque black.
+func hexRGBA(hex string) imgcolor.RGBA {
+	var r, g, b uint8
+	if _, e := fmt.Sscanf(hex, "#%02x%02x%02x", &r, &g, &b); e != nil {
+		return imgcolor.RGBA{A: 255}
+	}
+	return imgcolor.RGBA{r, g, b, 255}
 }

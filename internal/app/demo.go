@@ -13,7 +13,7 @@ func known(v float64) Metric { return Metric{Value: v, Known: true} }
 func demo(r datefilter.Range, loc *time.Location) Snapshot {
 	s := Snapshot{Sections: map[string][]Row{}, Loaded: time.Now()}
 	start := time.Date(2026, 9, 1, 0, 0, 0, 0, loc)
-	end := start.AddDate(0, 1, -1)
+	var end time.Time
 	if r.Since != "" {
 		start, _ = datefilter.Parse(r.Since, loc)
 	}

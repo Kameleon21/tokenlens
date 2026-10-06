@@ -31,7 +31,7 @@ go run . --demo
 make check
 ```
 
-Run `gofmt` on Go files you change. Normal tests use synthetic fixtures and local HTTP test servers; they must not require personal logs, credentials, Bun, or an external service. Live integration tests are opt-in.
+`make check` also runs a pinned staticcheck through `go run`, which downloads it on first use. Run `gofmt` on Go files you change. Normal tests use synthetic fixtures and local HTTP test servers; they must not require personal logs, credentials, Bun, or an external service. Live integration tests are opt-in.
 
 ## Pull requests
 

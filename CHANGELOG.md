@@ -5,6 +5,11 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+### Fixed
+
+- Remove usage snapshots older than seven days from the cache directory. Snapshots from earlier versions, price revisions, and date ranges were previously kept indefinitely.
+- SVG and PNG chart exports use the selected theme's background, text, and series colors instead of always using the dark theme. PNG bars now match each row's on-screen color.
+
 ## [0.7.0] - 2026-09-17
 
 ### Added

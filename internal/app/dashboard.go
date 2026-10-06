@@ -273,31 +273,6 @@ func (m model) bars(rows []Row, w, h int, selected bool) string {
 	}
 	return strings.Join(lines, "\n")
 }
-func (m model) shareChart(rows []Row, w, h int) string {
-	if len(rows) == 0 {
-		return m.bars(rows, w, h, false)
-	}
-	sum := Metric{}
-	for _, r := range rows {
-		sum.add(m.value(r))
-	}
-	stacked := ""
-	if sum.Known && !sum.Partial && sum.Value > 0 {
-		used := 0
-		for i, r := range rows {
-			n := int(math.Round(m.value(r).Value / sum.Value * float64(w)))
-			n = min(n, w-used)
-			if i == len(rows)-1 {
-				n = w - used
-			}
-			stacked += lipgloss.NewStyle().Foreground(color(r.Name)).Render(strings.Repeat("█", max(0, n)))
-			used += n
-		}
-	} else {
-		stacked = muted.Render("Shares unavailable for incomplete metrics")
-	}
-	return stacked + "\n\n" + m.bars(rows, w, max(1, h-2), false)
-}
 func (m model) modelChart(w, h int) string { return m.ringChart(m.ranked("models"), w, h) }
 func (m model) ringChart(rows []Row, w, h int) string {
 	if w < 50 || h < 10 || len(rows) == 0 {
