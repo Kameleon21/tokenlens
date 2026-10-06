@@ -84,7 +84,7 @@ func TestCopySessionGuards(t *testing.T) {
 			if name == "date input" && next.input.Value() != "y" {
 				t.Fatal("shortcut swallowed typed text")
 			}
-			if name == "theme search" && next.themeQuery.Value() != "y" {
+			if name == "theme search" && next.theme.query.Value() != "y" {
 				t.Fatal("shortcut swallowed theme search")
 			}
 		})

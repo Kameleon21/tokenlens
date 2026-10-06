@@ -157,11 +157,11 @@ func TestComparisonNavigationAndCompactScrolling(t *testing.T) {
 func TestThemeShortcutLeavesCtrlTUnbound(t *testing.T) {
 	m := fixtureModel()
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyCtrlT})
-	if m.choosingTheme {
+	if m.theme.active {
 		t.Fatal("Ctrl+T captured")
 	}
 	m = key(m, "T")
-	if !m.choosingTheme {
+	if !m.theme.active {
 		t.Fatal("Shift+T did not open picker")
 	}
 }

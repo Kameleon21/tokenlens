@@ -17,7 +17,7 @@ func TestThemePickerApplyAndCancel(t *testing.T) {
 	m.o.Theme = "nord"
 	m.agent, m.view = "codex", 2
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'T'}})
-	if !m.choosingTheme || m.o.Theme != "nord" {
+	if !m.theme.active || m.o.Theme != "nord" {
 		t.Fatal("opening picker changed theme or failed")
 	}
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("tnd")})
@@ -25,13 +25,13 @@ func TestThemePickerApplyAndCancel(t *testing.T) {
 		t.Fatal("fuzzy search did not preview Tokyo Night Dark")
 	}
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyEsc})
-	if m.choosingTheme || m.o.Theme != "nord" || activeTheme != "nord" {
+	if m.theme.active || m.o.Theme != "nord" || activeTheme != "nord" {
 		t.Fatal("cancel did not restore original theme")
 	}
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'T'}})
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("solarized dark")})
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if m.choosingTheme || m.o.Theme != "solarized-dark" {
+	if m.theme.active || m.o.Theme != "solarized-dark" {
 		t.Fatal("did not apply Solarized Dark")
 	}
 	if m.agent != "codex" || m.view != 2 {
@@ -62,20 +62,20 @@ func TestThemePickerNavigationAndEmptyResults(t *testing.T) {
 	}
 	// q and application shortcuts must enter the search rather than leaking through.
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("qz123")})
-	if m.themeQuery.Value() != "qz123" || len(m.matchingThemes()) != 0 {
+	if m.theme.query.Value() != "qz123" || len(m.theme.matches()) != 0 {
 		t.Fatal("input leaked through picker")
 	}
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyEnter})
-	if !m.choosingTheme || m.o.Theme != "dark" {
+	if !m.theme.active || m.o.Theme != "dark" {
 		t.Fatal("empty results applied a theme")
 	}
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyCtrlU})
-	if len(m.matchingThemes()) != len(themeNames) {
+	if len(m.theme.matches()) != len(themeNames) {
 		t.Fatal("clearing search did not restore choices")
 	}
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyEsc})
 	m = pickerKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'T'}})
-	if !m.choosingTheme {
+	if !m.theme.active {
 		t.Fatal("Shift+T shortcut did not open picker")
 	}
 }
@@ -93,8 +93,8 @@ func TestThemePickerFits(t *testing.T) {
 			m.width, m.height = wh[0], wh[1]
 			m = pickerKey(m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'T'}})
 			for _, query := range []string{"", "no such theme"} {
-				m.themeQuery.SetValue(query)
-				m.themeCursor = 0
+				m.theme.query.SetValue(query)
+				m.theme.cursor = 0
 				rendered := m.View()
 				lines := strings.Split(ansi.Strip(rendered), "\n")
 				if len(lines) != m.height {

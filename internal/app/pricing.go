@@ -308,6 +308,36 @@ type pricesMsg struct {
 	err     error
 }
 
+type priceState struct {
+	prices       priceCatalog
+	priceLoading bool
+	priceAttempt time.Time
+	priceErr     string
+}
+
+func (m model) handlePrices(v pricesMsg) (tea.Model, tea.Cmd) {
+	m.priceLoading = false
+	if v.err != nil {
+		m.priceErr = v.err.Error()
+		return m, nil
+	}
+	changed := v.catalog.revision() != m.o.priceRevision
+	m.priceErr = ""
+	m.prices = v.catalog
+	m.o.priceRevision = v.catalog.revision()
+	if !changed {
+		if m.s.PriceRevision == m.o.priceRevision {
+			m.s.PriceDate = v.catalog.Fetched
+		}
+		return m, nil
+	}
+	m.reports = nil
+	if !m.loading {
+		return m, m.refresh(m.o.Range, true)
+	}
+	return m, nil
+}
+
 func (m *model) refreshPrices(force bool) tea.Cmd {
 	if !m.o.managedPrices || m.o.Demo || m.o.Offline || m.priceLoading {
 		return nil

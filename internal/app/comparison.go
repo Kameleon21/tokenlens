@@ -12,6 +12,68 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+type comparison struct {
+	comparing, compareWeekday    bool
+	compareSelected, compareDate string
+	compareOffset                int
+}
+
+func (m *model) toggleComparison() {
+	if m.view != 0 || m.o.Group != "daily" {
+		return
+	}
+	if m.comparing {
+		m.compareWeekday = !m.compareWeekday
+		m.compareDate = ""
+	} else {
+		m.comparison = comparison{}
+		if !m.activityDetail && !m.details && m.width >= 96 && m.height >= 32 {
+			if periods := m.chartPeriods(); len(periods) > 0 {
+				m.focusRow(periods[min(m.dayCursor, len(periods)-1)].Name)
+			}
+		}
+		m.comparing = true
+		m.compareSelected = m.comparisonSelected().Name
+	}
+	m.compareOffset = 0
+}
+
+func (m *model) scrollComparison(key string) {
+	step := 5
+	if key == "pgup" {
+		step = -step
+	}
+	m.compareOffset = max(0, min(len(m.comparisonLines(max(1, m.width-10)))-1, m.compareOffset+step))
+}
+
+// Row navigation, filters and view changes hand the selection back to the dashboard.
+func (m *model) releaseComparison(key string) {
+	switch key {
+	case "up", "down", "j", "k", "home", "end":
+		m.focusRow(m.compareSelected)
+		m.compareSelected = ""
+		m.compareOffset = 0
+	case "a", "f", "x", "C":
+		m.compareOffset = 0
+	}
+	switch key {
+	case "1", "2", "3", "4", "5", "tab", "shift+tab", "d", "w", "m":
+		m.comparing = false
+	}
+}
+
+func (m model) comparisonInput() string {
+	selected := m.comparisonSelected().Name
+	if selected == "" {
+		selected = m.compareSelected
+	}
+	if selected == "" {
+		selected = time.Now().Format("2006-01-02")
+	}
+	_, baseline, _ := m.comparisonBaseline(selected)
+	return baseline + " to " + selected
+}
+
 // Compare calendar dates, never adjacent report rows: gaps are not zero usage.
 func (m model) comparisonBaseline(selected string) (Row, string, bool) {
 	date, err := time.Parse("2006-01-02", selected)
