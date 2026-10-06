@@ -10,22 +10,42 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-func (m *model) openThemePicker() tea.Cmd {
-	m.choosingTheme = true
-	m.themeOriginal = m.o.Theme
-	m.themeCursor = 0
-	m.themeQuery = textinput.New()
-	m.themeQuery.Prompt = "Search: "
-	m.themeQuery.Placeholder = "type a theme name"
-	m.themeQuery.CharLimit = 64
-	m.themeQuery.Focus()
+type themePicker struct {
+	active   bool
+	original string
+	cursor   int
+	query    textinput.Model
+}
+
+func newThemePicker(current string) themePicker {
+	p := themePicker{active: true, original: current, query: textinput.New()}
+	p.query.Prompt = "Search: "
+	p.query.Placeholder = "type a theme name"
+	p.query.CharLimit = 64
+	p.query.Focus()
 	for i, name := range themeNames {
-		if name == m.o.Theme {
-			m.themeCursor = i
+		if name == current {
+			p.cursor = i
 			break
 		}
 	}
+	return p
+}
+
+func (m *model) openThemePicker() tea.Cmd {
+	m.theme = newThemePicker(m.o.Theme)
 	return textinput.Blink
+}
+
+func (p *themePicker) close() {
+	p.active = false
+	p.query.Blur()
+}
+
+func (p *themePicker) move(step, count int) {
+	if count > 0 {
+		p.cursor = (p.cursor + count + step) % count
+	}
 }
 
 // A subsequence match supports short queries such as "tnd" for Tokyo Night Dark.
@@ -39,10 +59,10 @@ func fuzzyThemeMatch(query, candidate string) bool {
 	return len(remaining) == 0
 }
 
-func (m model) matchingThemes() []string {
+func (p themePicker) matches() []string {
 	var matches []string
 	for _, name := range themeNames {
-		if fuzzyThemeMatch(m.themeQuery.Value(), themeLabel(name)) || fuzzyThemeMatch(m.themeQuery.Value(), name) {
+		if fuzzyThemeMatch(p.query.Value(), themeLabel(name)) || fuzzyThemeMatch(p.query.Value(), name) {
 			matches = append(matches, name)
 		}
 	}
@@ -56,74 +76,68 @@ func (m *model) previewTheme(name string) {
 }
 
 func (m model) updateThemePicker(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	matches := m.matchingThemes()
+	matches := m.theme.matches()
 	var cmd tea.Cmd
 	switch msg.String() {
 	case "esc":
-		m.previewTheme(m.themeOriginal)
-		m.choosingTheme = false
-		m.themeQuery.Blur()
+		m.previewTheme(m.theme.original)
+		m.theme.close()
 		return m, nil
 	case "enter":
 		if len(matches) == 0 {
 			return m, nil
 		}
-		m.previewTheme(matches[m.themeCursor])
+		m.previewTheme(matches[m.theme.cursor])
 		m.savePreference(func(p *Preferences) { p.Theme = m.o.Theme })
-		m.choosingTheme = false
-		m.themeQuery.Blur()
+		m.theme.close()
 		return m, nil
 	case "down", "ctrl+n", "tab":
-		if len(matches) > 0 {
-			m.themeCursor = (m.themeCursor + 1) % len(matches)
-		}
+		m.theme.move(1, len(matches))
 	case "up", "ctrl+p", "shift+tab":
-		if len(matches) > 0 {
-			m.themeCursor = (m.themeCursor + len(matches) - 1) % len(matches)
-		}
+		m.theme.move(-1, len(matches))
 	default:
-		before := m.themeQuery.Value()
-		m.themeQuery, cmd = m.themeQuery.Update(msg)
-		if before != m.themeQuery.Value() {
-			m.themeCursor = 0
+		before := m.theme.query.Value()
+		m.theme.query, cmd = m.theme.query.Update(msg)
+		if before != m.theme.query.Value() {
+			m.theme.cursor = 0
 		}
 	}
-	matches = m.matchingThemes()
+	matches = m.theme.matches()
 	if len(matches) > 0 {
-		m.previewTheme(matches[m.themeCursor])
+		m.previewTheme(matches[m.theme.cursor])
 	}
 	return m, cmd
 }
 
 func (m model) View() string {
 	base := m.dashboardView()
-	if !m.choosingTheme {
+	if !m.theme.active {
 		return base
 	}
 	// Use a centered modal over the real dashboard so navigation previews the palette.
 	w := max(1, min(62, m.width-4))
 	inner := max(1, w-4)
 	slots := max(1, min(len(themeNames), m.height-10))
-	matches := m.matchingThemes()
-	start := max(0, m.themeCursor-slots+1)
+	matches := m.theme.matches()
+	start := max(0, m.theme.cursor-slots+1)
 	lines := []string{
 		bright.Render("CHOOSE THEME"),
-		muted.Render("Applied: " + themeLabel(m.themeOriginal)),
+		muted.Render("Applied: " + themeLabel(m.theme.original)),
 	}
-	m.themeQuery.Width = max(1, inner-9)
-	m.themeQuery.PromptStyle = accent
-	m.themeQuery.TextStyle = lipgloss.NewStyle().Foreground(ink)
-	m.themeQuery.PlaceholderStyle = muted
-	lines = append(lines, m.themeQuery.View(), muted.Render(strings.Repeat("─", inner)))
+	m.theme.query.Width = max(1, inner-9)
+	m.theme.query.PromptStyle = accent
+	m.theme.query.TextStyle = lipgloss.NewStyle().Foreground(ink)
+	m.theme.query.PlaceholderStyle = muted
+	lines = append(lines, m.theme.query.View(), muted.Render(strings.Repeat("─", inner)))
 	for i := start; i < start+slots; i++ {
 		row := ""
 		if i < len(matches) {
 			name := matches[i]
 			row = "  " + themeLabel(name)
-			if name == m.themeOriginal {
+			if name == m.theme.original {
 				row += " (current)"
 			}
-			if i == m.themeCursor {
+			if i == m.theme.cursor {
 				row = accent.Bold(true).Background(surface).Render(fit("> "+strings.TrimSpace(row), inner, 1))
 			}
 		} else if i == start && len(matches) == 0 {

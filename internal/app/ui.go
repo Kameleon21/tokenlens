@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/Kameleon21/tokenlens/internal/datefilter"
 	"hash/fnv"
-	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -30,31 +29,16 @@ type loadedMsg struct {
 	id  int
 	r   datefilter.Range
 }
-type exchangeMsg struct {
-	exchange Exchange
-	err      error
-	id       int
-}
 type model struct {
+	comparison
+	exchangeState
+	priceState
+	theme                                 themePicker
 	copying                               bool
 	clipboardWrite                        func(context.Context, string) error
-	compareSelected, compareDate          string
-	comparing, compareWeekday             bool
-	compareOffset                         int
 	helpOffset                            int
 	displayLocation                       *time.Location
-	prices                                priceCatalog
-	priceLoading                          bool
-	priceAttempt                          time.Time
-	priceErr                              string
-	choosingTheme                         bool
-	themeOriginal                         string
-	themeCursor                           int
-	themeQuery                            textinput.Model
 	reports                               map[datefilter.Range]Snapshot
-	fxRequest                             int
-	fxTarget                              string
-	exchanges                             map[string]Exchange
 	compactNumbers                        bool
 	info                                  string
 	cached                                bool
@@ -64,10 +48,6 @@ type model struct {
 	notice                                string
 	widget, layout                        int
 	activityDetail                        bool
-	fx                                    Exchange
-	fxLoading                             bool
-	fxErr                                 string
-	fxCancel                              context.CancelFunc
 	ctx                                   context.Context
 	o                                     Options
 	s                                     Snapshot
@@ -122,7 +102,7 @@ func newModel(ctx context.Context, o Options) model {
 	if o.preferences.ModelsSort == "" {
 		o.preferences.ModelsSort = defaults.ModelsSort
 	}
-	return model{displayLocation: loc, prices: prices, ctx: ctx, o: o, width: 100, height: 32, cost: o.preferences.Display != "tokens", compactNumbers: o.preferences.CompactNumbers, layout: layout, spin: sp, input: ti, fx: initialExchange(o, time.Now())}
+	return model{displayLocation: loc, priceState: priceState{prices: prices}, ctx: ctx, o: o, width: 100, height: 32, cost: o.preferences.Display != "tokens", compactNumbers: o.preferences.CompactNumbers, layout: layout, spin: sp, input: ti, exchangeState: exchangeState{fx: initialExchange(o, time.Now())}}
 }
 func (m model) Init() tea.Cmd {
 	initial := func() tea.Msg { return "initial-load" }
@@ -192,63 +172,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case priceTickMsg:
 		return m, tea.Batch(m.refreshPrices(false), priceTick())
 	case pricesMsg:
-		m.priceLoading = false
-		if v.err != nil {
-			m.priceErr = v.err.Error()
-			return m, nil
-		}
-		changed := v.catalog.revision() != m.o.priceRevision
-		m.priceErr = ""
-		m.prices = v.catalog
-		m.o.priceRevision = v.catalog.revision()
-		if !changed {
-			if m.s.PriceRevision == m.o.priceRevision {
-				m.s.PriceDate = v.catalog.Fetched
-			}
-			return m, nil
-		}
-		m.reports = nil
-		if !m.loading {
-			return m, m.refresh(m.o.Range, true)
-		}
-		return m, nil
+		return m.handlePrices(v)
 	case tea.MouseMsg:
-		if m.choosingTheme || m.help || m.comparing {
-			return m, nil
-		}
-		if m.view == 0 && !m.activityDetail && !m.details && m.width >= 96 && m.height >= 32 && m.layout == 0 && v.Y >= 19 && v.Y < 16+(m.height-20)/2-1 && v.X >= 5 && v.X < (m.width-4)/2 {
-			rows := m.chartPeriods()
-			count := max(1, ((m.width-6)/2-6)/3)
-			start := max(0, min(m.dayCursor, max(0, len(rows)-1))-count+1)
-			m.dayCursor = min(max(0, len(rows)-1), start+(v.X-5)/3)
-			m.widget = 0
-		}
+		return m.handleMouse(v)
 	case tea.WindowSizeMsg:
 		m.width = v.Width
 		m.height = v.Height
 	case cachedMsg:
-		if v.id == m.request && m.loading {
-			m.s = v.s
-			m.o.Range = v.r
-			m.cached = true
-		}
-		return m, nil
+		return m.handleCached(v)
 	case reusedMsg:
-		if v.id != m.request {
-			return m, nil
-		}
-		m.loading = false
-		m.cached = true
-		m.s, m.o.Range = v.s, v.r
-		if m.o.managedPrices && m.s.PriceRevision == m.o.priceRevision {
-			m.s.PriceDate = m.prices.Fetched
-		}
-		m.cursor, m.details = 0, false
-		m.remember(v.r, m.s)
-		if m.o.managedPrices && m.s.PriceRevision != m.o.priceRevision {
-			return m, m.refresh(v.r, true)
-		}
-		return m, nil
+		return m.handleReused(v)
 	case copiedSessionMsg:
 		m.copying = false
 		if v.err != nil {
@@ -265,397 +198,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case exchangeMsg:
-		if v.id != m.fxRequest {
-			return m, nil
-		}
-		m.fxLoading = false
-		if v.err != nil {
-			m.fxErr = v.err.Error()
-		} else {
-			m.fx = v.exchange
-			if m.exchanges == nil {
-				m.exchanges = make(map[string]Exchange)
-			}
-			m.exchanges[v.exchange.Currency] = v.exchange
-			m.fxErr = ""
-		}
+		return m.handleExchange(v)
 	case loadedMsg:
-		if v.id != m.request {
-			return m, nil
-		}
-		m.loading = false
-		if v.err != nil {
-			m.err = v.err.Error()
-		} else {
-			m.s = v.s
-			m.remember(v.r, v.s)
-			m.cached = false
-			m.o.Range = v.r
-			m.cursor = 0
-			m.details = false
-		}
-		if v.err == nil && m.o.managedPrices && v.s.PriceRevision != m.o.priceRevision {
-			return m, m.refresh(v.r, true)
-		}
+		return m.handleLoaded(v)
 	case tea.KeyMsg:
-		key := v.String()
-		if key == "ctrl+c" {
-			if m.cancel != nil {
-				m.cancel()
-			}
-			if m.fxCancel != nil {
-				m.fxCancel()
-			}
-			return m, tea.Quit
-		}
-		if m.choosingTheme {
-			return m.updateThemePicker(v)
-		}
-		if m.exporting {
-			if key == "esc" || key == "q" {
-				m.exporting = false
-				return m, nil
-			}
-			formats := map[string]string{"1": "json", "2": "csv", "3": "svg", "4": "png"}
-			if format, ok := formats[key]; ok {
-				m.exporting = false
-				return m, m.exportCmd(format)
-			}
-			return m, nil
-		}
-		if m.editing != "" {
-			if key == "esc" {
-				if m.editing == "comparison" {
-					m.err = ""
-				}
-				m.editing = ""
-				m.input.Blur()
-				return m, nil
-			}
-			if key == "enter" && m.editing == "comparison" {
-				return m.applyComparisonDates()
-			}
-			if key == "enter" {
-				parts := strings.Fields(m.input.Value())
-				if pair := strings.Split(strings.ReplaceAll(m.input.Value(), " to ", "→"), "→"); len(pair) == 2 {
-					parts = []string{strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1])}
-				}
-				loc, _ := time.LoadLocation(m.o.TZ)
-				var r datefilter.Range
-				var e error
-				if len(parts) == 1 && parts[0] == "month" {
-					r, e = datefilter.Resolve("", "", 0, m.o.Group, time.Now(), loc)
-				} else if len(parts) == 2 && parts[0] == "last" {
-					var n int
-					if _, err := fmt.Sscanf(parts[1], "%d", &n); err != nil || n <= 0 || fmt.Sprint(n) != parts[1] {
-						e = fmt.Errorf("use last N with a positive integer")
-					} else {
-						r, e = datefilter.Resolve("", "", n, m.o.Group, time.Now(), loc)
-					}
-				} else if len(parts) == 2 {
-					s, u := m.canonicalDate(parts[0]), m.canonicalDate(parts[1])
-					if s == "*" {
-						s = ""
-					}
-					if u == "*" {
-						u = ""
-					}
-					r, e = datefilter.Resolve(s, u, 0, m.o.Group, time.Now(), loc)
-				} else {
-					e = fmt.Errorf("enter two dates (use * for an open bound), month, or last N")
-				}
-				if e != nil {
-					m.err = e.Error()
-					return m, nil
-				}
-				m.editing = ""
-				m.input.Blur()
-				return m, m.refresh(r)
-			}
-			var cmd tea.Cmd
-			m.input, cmd = m.input.Update(msg)
-			return m, cmd
-		}
-		if key == "q" {
-			if m.cancel != nil {
-				m.cancel()
-			}
-			if m.fxCancel != nil {
-				m.fxCancel()
-			}
-			return m, tea.Quit
-		}
-		if key == "esc" {
-			if m.help {
-				m.help = false
-				return m, nil
-			}
-			if m.comparing {
-				m.comparing = false
-				return m, nil
-			}
-			m.details = false
-			m.info = ""
-			m.notice = ""
-			m.activityDetail = false
-			m.help = false
-			m.err = ""
-			return m, nil
-		}
-		if key == "?" {
-			m.help = !m.help
-			m.helpOffset = 0
-			return m, nil
-		}
-		if key == "T" {
-			cmd := m.openThemePicker()
-			return m, cmd
-		}
-		if m.help {
-			switch key {
-			case "j", "down":
-				m.helpOffset++
-			case "k", "up":
-				m.helpOffset--
-			case "home":
-				m.helpOffset = 0
-			case "end":
-				m.helpOffset = len(strings.Split(m.helpText(), "\n"))
-			}
-			m.helpOffset = max(0, min(m.helpOffset, max(0, len(strings.Split(m.helpText(), "\n"))-1)))
-			return m, nil
-		}
-		if m.comparing {
-			switch key {
-			case "pgdown", "pgup":
-				step := 5
-				if key == "pgup" {
-					step = -step
-				}
-				m.compareOffset = max(0, min(len(m.comparisonLines(max(1, m.width-10)))-1, m.compareOffset+step))
-				return m, nil
-			case "up", "down", "j", "k", "home", "end":
-				for i, r := range m.rows() {
-					if r.Name == m.compareSelected {
-						m.cursor = i
-						break
-					}
-				}
-				m.compareSelected = ""
-				m.compareOffset = 0
-			case "a", "f", "x", "C":
-				m.compareOffset = 0
-			}
-			switch key {
-			case "1", "2", "3", "4", "5", "tab", "shift+tab", "d", "w", "m":
-				m.comparing = false
-			}
-		}
-		switch key {
-		case "C":
-			if m.view != 0 || m.o.Group != "daily" {
-				return m, nil
-			}
-			if m.comparing {
-				m.compareWeekday = !m.compareWeekday
-				m.compareDate = ""
-			} else {
-				m.compareSelected, m.compareDate = "", ""
-				m.compareWeekday = false
-				if !m.activityDetail && !m.details && m.width >= 96 && m.height >= 32 {
-					periods := m.chartPeriods()
-					if len(periods) > 0 {
-						selected := periods[min(m.dayCursor, len(periods)-1)].Name
-						for i, r := range m.rows() {
-							if r.Name == selected {
-								m.cursor = i
-								break
-							}
-						}
-					}
-				}
-				m.comparing = true
-				m.compareSelected = m.comparisonSelected().Name
-			}
-			m.compareOffset = 0
-			return m, nil
-		case "1", "2", "3", "4", "5":
-			m.view = int(key[0] - '1')
-			m.activityDetail = false
-			m.cursor = 0
-			m.details = false
-		case "tab":
-			m.view = (m.view + 1) % len(views)
-			m.activityDetail = false
-			m.cursor = 0
-			m.details = false
-		case "shift+tab":
-			m.view = (m.view + len(views) - 1) % len(views)
-			m.cursor = 0
-			m.details = false
-		case "d":
-			m.o.Group = "daily"
-			m.savePreference(func(p *Preferences) { p.Grouping = m.o.Group })
-			m.cursor = 0
-		case "w":
-			m.o.Group = "weekly"
-			m.savePreference(func(p *Preferences) { p.Grouping = m.o.Group })
-			m.cursor = 0
-		case "m":
-			m.o.Group = "monthly"
-			m.savePreference(func(p *Preferences) { p.Grouping = m.o.Group })
-			m.cursor = 0
-		case "y":
-			cmd := m.copySessionCmd()
-			return m, cmd
-		case "c":
-			m.cost = !m.cost
-			m.savePreference(func(p *Preferences) {
-				p.Display = "tokens"
-				if m.cost {
-					p.Display = "cost"
-				}
-			})
-		case "s":
-			switch m.view {
-			case 2:
-				m.o.preferences.ModelsSort = cycle(modelSorts, m.tabSort())
-				m.savePreference(func(p *Preferences) { p.ModelsSort = m.o.preferences.ModelsSort })
-			case 4:
-				m.o.preferences.SessionsSort = cycle(sessionSorts, m.tabSort())
-				m.savePreference(func(p *Preferences) { p.SessionsSort = m.o.preferences.SessionsSort })
-			default:
-				m.sortMode = (m.sortMode + 1) % 3
-			}
-			m.cursor = 0
-			return m, nil
-		case "D":
-			m.o.preferences.DateFormat = cycle([]string{"european", "us", "iso"}, m.o.preferences.DateFormat)
-			m.savePreference(func(p *Preferences) { p.DateFormat = m.o.preferences.DateFormat })
-			return m, nil
-		case "H":
-			m.o.preferences.ClockFormat = cycle([]string{"24h", "12h"}, m.o.preferences.ClockFormat)
-			m.savePreference(func(p *Preferences) { p.ClockFormat = m.o.preferences.ClockFormat })
-			return m, nil
-		case "j", "down":
-			if m.cursor < len(m.rows())-1 {
-				m.cursor++
-			}
-		case "k", "up":
-			if m.cursor > 0 {
-				m.cursor--
-			}
-		case "home", "g":
-			m.cursor = 0
-		case "end", "G":
-			m.cursor = max(0, len(m.rows())-1)
-		case "n":
-			m.compactNumbers = !m.compactNumbers
-			m.savePreference(func(p *Preferences) { p.CompactNumbers = m.compactNumbers })
-		case "e":
-			m.o.Currency = cycle([]string{"USD", "EUR", "GBP", "JPY"}, m.o.Currency)
-			m.savePreference(func(p *Preferences) { p.Currency = m.o.Currency })
-			return m, m.refreshExchange()
-		case "p":
-			m.preset = (m.preset + 1) % 4
-			m.notice = []string{"This calendar month", "This billing cycle", "Last 30 days", "Since August 1"}[m.preset]
-			return m, m.refresh(m.presetRange(m.preset))
-		case "b":
-			m.showPlan = !m.showPlan
-		case "o":
-			m.exporting = true
-		case "h":
-			m.info = "Hourly / 5-hour costs unavailable: ccusage unified JSON has no timed usage events. Daily, weekly, monthly are available."
-		case "left":
-			m.dayCursor = max(0, m.dayCursor-1)
-		case "right":
-			m.dayCursor = min(max(0, len(m.chartPeriods())-1), m.dayCursor+1)
-		case "[":
-			m.widget = (m.widget + 3) % 4
-		case "]":
-			m.widget = (m.widget + 1) % 4
-		case "v":
-			m.layout = (m.layout + 1) % 2
-			m.savePreference(func(p *Preferences) {
-				p.Layout = "dashboard"
-				if m.layout == 1 {
-					p.Layout = "stacked"
-				}
-			})
-		case "enter":
-			if m.view == 0 && !m.activityDetail && m.width >= 96 && m.height >= 32 {
-				selectedPeriod := ""
-				periods := m.chartPeriods()
-				if m.widget == 0 && len(periods) > 0 {
-					selectedPeriod = periods[min(m.dayCursor, len(periods)-1)].Name
-				}
-				switch m.widget {
-				case 0:
-					m.activityDetail = true
-				case 1:
-					m.view = 2
-				case 2:
-					m.view = 4
-				case 3:
-					m.activityDetail = true
-				}
-				m.cursor = 0
-				if selectedPeriod != "" {
-					for i, r := range m.rows() {
-						if r.Name == selectedPeriod {
-							m.cursor = i
-							break
-						}
-					}
-				}
-			} else {
-				m.details = !m.details
-			}
-		case "a":
-			m.agent = cycle(names(m.s, "agent"), m.agent)
-			m.cursor = 0
-			m.details = false
-		case "f":
-			m.modelFilter = cycle(names(m.s, "model"), m.modelFilter)
-			m.cursor = 0
-			m.details = false
-		case "x":
-			m.agent = ""
-			m.modelFilter = ""
-			m.cursor = 0
-		case "r":
-			r := m.o.Range
-			if m.loading {
-				r = m.pending
-			}
-			return m, m.refresh(r, true)
-		case "t":
-			if m.comparing {
-				m.editing = "comparison"
-				selected := m.comparisonSelected().Name
-				if selected == "" {
-					selected = m.compareSelected
-				}
-				if selected == "" {
-					selected = time.Now().Format("2006-01-02")
-				}
-				_, baseline, _ := m.comparisonBaseline(selected)
-				m.input.SetValue(baseline + " to " + selected)
-				m.input.Focus()
-				return m, textinput.Blink
-			}
-			m.editing = "range"
-			m.input.SetValue(m.rangeInput())
-			m.input.Focus()
-			return m, textinput.Blink
-		}
+		return m.handleKey(v)
 	}
+	return m.settle(msg)
+}
+
+// settle finishes every update that a handler did not answer directly.
+func (m model) settle(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if m.comparing && m.compareSelected == "" {
 		m.compareSelected = m.comparisonSelected().Name
 	}
 	var cmd tea.Cmd
-	if m.choosingTheme {
-		m.themeQuery, cmd = m.themeQuery.Update(msg)
+	if m.theme.active {
+		m.theme.query, cmd = m.theme.query.Update(msg)
 	}
 	if m.loading {
 		var spinCmd tea.Cmd
@@ -663,6 +222,378 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmd = tea.Batch(cmd, spinCmd)
 	}
 	return m, cmd
+}
+func (m model) handleMouse(v tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if m.theme.active || m.help || m.comparing {
+		return m, nil
+	}
+	if m.view == 0 && !m.activityDetail && !m.details && m.width >= 96 && m.height >= 32 && m.layout == 0 && v.Y >= 19 && v.Y < 16+(m.height-20)/2-1 && v.X >= 5 && v.X < (m.width-4)/2 {
+		rows := m.chartPeriods()
+		count := max(1, ((m.width-6)/2-6)/3)
+		start := max(0, min(m.dayCursor, max(0, len(rows)-1))-count+1)
+		m.dayCursor = min(max(0, len(rows)-1), start+(v.X-5)/3)
+		m.widget = 0
+	}
+	return m.settle(v)
+}
+func (m model) handleCached(v cachedMsg) (tea.Model, tea.Cmd) {
+	if v.id == m.request && m.loading {
+		m.s = v.s
+		m.o.Range = v.r
+		m.cached = true
+	}
+	return m, nil
+}
+func (m model) handleReused(v reusedMsg) (tea.Model, tea.Cmd) {
+	if v.id != m.request {
+		return m, nil
+	}
+	m.loading = false
+	m.cached = true
+	m.s, m.o.Range = v.s, v.r
+	if m.o.managedPrices && m.s.PriceRevision == m.o.priceRevision {
+		m.s.PriceDate = m.prices.Fetched
+	}
+	m.cursor, m.details = 0, false
+	m.remember(v.r, m.s)
+	if m.o.managedPrices && m.s.PriceRevision != m.o.priceRevision {
+		return m, m.refresh(v.r, true)
+	}
+	return m, nil
+}
+func (m model) handleLoaded(v loadedMsg) (tea.Model, tea.Cmd) {
+	if v.id != m.request {
+		return m, nil
+	}
+	m.loading = false
+	if v.err != nil {
+		m.err = v.err.Error()
+	} else {
+		m.s = v.s
+		m.remember(v.r, v.s)
+		m.cached = false
+		m.o.Range = v.r
+		m.cursor = 0
+		m.details = false
+	}
+	if v.err == nil && m.o.managedPrices && v.s.PriceRevision != m.o.priceRevision {
+		return m, m.refresh(v.r, true)
+	}
+	return m.settle(v)
+}
+func (m model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	key := msg.String()
+	switch {
+	case key == "ctrl+c":
+		return m.quit()
+	case m.theme.active:
+		return m.updateThemePicker(msg)
+	case m.exporting:
+		return m.updateExporting(key)
+	case m.editing != "":
+		return m.updateEditing(msg)
+	case key == "q":
+		return m.quit()
+	case key == "esc":
+		return m.dismiss()
+	case key == "?":
+		m.help = !m.help
+		m.helpOffset = 0
+		return m, nil
+	case key == "T":
+		cmd := m.openThemePicker()
+		return m, cmd
+	case m.help:
+		return m.updateHelp(key)
+	}
+	if m.comparing {
+		if key == "pgdown" || key == "pgup" {
+			m.scrollComparison(key)
+			return m, nil
+		}
+		m.releaseComparison(key)
+	}
+	return m.updateDashboard(msg)
+}
+func (m model) quit() (tea.Model, tea.Cmd) {
+	if m.cancel != nil {
+		m.cancel()
+	}
+	m.stopExchange()
+	return m, tea.Quit
+}
+func (m model) dismiss() (tea.Model, tea.Cmd) {
+	if m.help {
+		m.help = false
+		return m, nil
+	}
+	if m.comparing {
+		m.comparing = false
+		return m, nil
+	}
+	m.details = false
+	m.info = ""
+	m.notice = ""
+	m.activityDetail = false
+	m.err = ""
+	return m, nil
+}
+func (m model) updateExporting(key string) (tea.Model, tea.Cmd) {
+	if key == "esc" || key == "q" {
+		m.exporting = false
+		return m, nil
+	}
+	formats := map[string]string{"1": "json", "2": "csv", "3": "svg", "4": "png"}
+	if format, ok := formats[key]; ok {
+		m.exporting = false
+		return m, m.exportCmd(format)
+	}
+	return m, nil
+}
+func (m model) updateHelp(key string) (tea.Model, tea.Cmd) {
+	lines := len(strings.Split(m.helpText(), "\n"))
+	switch key {
+	case "j", "down":
+		m.helpOffset++
+	case "k", "up":
+		m.helpOffset--
+	case "home":
+		m.helpOffset = 0
+	case "end":
+		m.helpOffset = lines
+	}
+	m.helpOffset = max(0, min(m.helpOffset, max(0, lines-1)))
+	return m, nil
+}
+func (m model) updateEditing(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		if m.editing == "comparison" {
+			m.err = ""
+		}
+		m.editing = ""
+		m.input.Blur()
+		return m, nil
+	case "enter":
+		if m.editing == "comparison" {
+			return m.applyComparisonDates()
+		}
+		r, e := m.parseRangeInput(m.input.Value())
+		if e != nil {
+			m.err = e.Error()
+			return m, nil
+		}
+		m.editing = ""
+		m.input.Blur()
+		return m, m.refresh(r)
+	}
+	var cmd tea.Cmd
+	m.input, cmd = m.input.Update(msg)
+	return m, cmd
+}
+func (m model) parseRangeInput(value string) (datefilter.Range, error) {
+	parts := strings.Fields(value)
+	if pair := strings.Split(strings.ReplaceAll(value, " to ", "→"), "→"); len(pair) == 2 {
+		parts = []string{strings.TrimSpace(pair[0]), strings.TrimSpace(pair[1])}
+	}
+	loc, _ := time.LoadLocation(m.o.TZ)
+	switch {
+	case len(parts) == 1 && parts[0] == "month":
+		return datefilter.Resolve("", "", 0, m.o.Group, time.Now(), loc)
+	case len(parts) == 2 && parts[0] == "last":
+		var n int
+		if _, err := fmt.Sscanf(parts[1], "%d", &n); err != nil || n <= 0 || fmt.Sprint(n) != parts[1] {
+			return datefilter.Range{}, fmt.Errorf("use last N with a positive integer")
+		}
+		return datefilter.Resolve("", "", n, m.o.Group, time.Now(), loc)
+	case len(parts) == 2:
+		s, u := m.canonicalDate(parts[0]), m.canonicalDate(parts[1])
+		if s == "*" {
+			s = ""
+		}
+		if u == "*" {
+			u = ""
+		}
+		return datefilter.Resolve(s, u, 0, m.o.Group, time.Now(), loc)
+	}
+	return datefilter.Range{}, fmt.Errorf("enter two dates (use * for an open bound), month, or last N")
+}
+func (m model) openDateEditor() (tea.Model, tea.Cmd) {
+	if m.comparing {
+		m.editing = "comparison"
+		m.input.SetValue(m.comparisonInput())
+	} else {
+		m.editing = "range"
+		m.input.SetValue(m.rangeInput())
+	}
+	m.input.Focus()
+	return m, textinput.Blink
+}
+func (m *model) focusRow(name string) {
+	for i, r := range m.rows() {
+		if r.Name == name {
+			m.cursor = i
+			return
+		}
+	}
+}
+func (m *model) openSelection() {
+	if m.view != 0 || m.activityDetail || m.width < 96 || m.height < 32 {
+		m.details = !m.details
+		return
+	}
+	selectedPeriod := ""
+	periods := m.chartPeriods()
+	if m.widget == 0 && len(periods) > 0 {
+		selectedPeriod = periods[min(m.dayCursor, len(periods)-1)].Name
+	}
+	switch m.widget {
+	case 0:
+		m.activityDetail = true
+	case 1:
+		m.view = 2
+	case 2:
+		m.view = 4
+	case 3:
+		m.activityDetail = true
+	}
+	m.cursor = 0
+	if selectedPeriod != "" {
+		m.focusRow(selectedPeriod)
+	}
+}
+func (m model) updateDashboard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch key := msg.String(); key {
+	case "C":
+		m.toggleComparison()
+		return m, nil
+	case "1", "2", "3", "4", "5":
+		m.view = int(key[0] - '1')
+		m.activityDetail = false
+		m.cursor = 0
+		m.details = false
+	case "tab":
+		m.view = (m.view + 1) % len(views)
+		m.activityDetail = false
+		m.cursor = 0
+		m.details = false
+	case "shift+tab":
+		m.view = (m.view + len(views) - 1) % len(views)
+		m.cursor = 0
+		m.details = false
+	case "d":
+		m.o.Group = "daily"
+		m.savePreference(func(p *Preferences) { p.Grouping = m.o.Group })
+		m.cursor = 0
+	case "w":
+		m.o.Group = "weekly"
+		m.savePreference(func(p *Preferences) { p.Grouping = m.o.Group })
+		m.cursor = 0
+	case "m":
+		m.o.Group = "monthly"
+		m.savePreference(func(p *Preferences) { p.Grouping = m.o.Group })
+		m.cursor = 0
+	case "y":
+		cmd := m.copySessionCmd()
+		return m, cmd
+	case "c":
+		m.cost = !m.cost
+		m.savePreference(func(p *Preferences) {
+			p.Display = "tokens"
+			if m.cost {
+				p.Display = "cost"
+			}
+		})
+	case "s":
+		switch m.view {
+		case 2:
+			m.o.preferences.ModelsSort = cycle(modelSorts, m.tabSort())
+			m.savePreference(func(p *Preferences) { p.ModelsSort = m.o.preferences.ModelsSort })
+		case 4:
+			m.o.preferences.SessionsSort = cycle(sessionSorts, m.tabSort())
+			m.savePreference(func(p *Preferences) { p.SessionsSort = m.o.preferences.SessionsSort })
+		default:
+			m.sortMode = (m.sortMode + 1) % 3
+		}
+		m.cursor = 0
+		return m, nil
+	case "D":
+		m.o.preferences.DateFormat = cycle([]string{"european", "us", "iso"}, m.o.preferences.DateFormat)
+		m.savePreference(func(p *Preferences) { p.DateFormat = m.o.preferences.DateFormat })
+		return m, nil
+	case "H":
+		m.o.preferences.ClockFormat = cycle([]string{"24h", "12h"}, m.o.preferences.ClockFormat)
+		m.savePreference(func(p *Preferences) { p.ClockFormat = m.o.preferences.ClockFormat })
+		return m, nil
+	case "j", "down":
+		if m.cursor < len(m.rows())-1 {
+			m.cursor++
+		}
+	case "k", "up":
+		if m.cursor > 0 {
+			m.cursor--
+		}
+	case "home", "g":
+		m.cursor = 0
+	case "end", "G":
+		m.cursor = max(0, len(m.rows())-1)
+	case "n":
+		m.compactNumbers = !m.compactNumbers
+		m.savePreference(func(p *Preferences) { p.CompactNumbers = m.compactNumbers })
+	case "e":
+		m.o.Currency = cycle([]string{"USD", "EUR", "GBP", "JPY"}, m.o.Currency)
+		m.savePreference(func(p *Preferences) { p.Currency = m.o.Currency })
+		return m, m.refreshExchange()
+	case "p":
+		m.preset = (m.preset + 1) % 4
+		m.notice = []string{"This calendar month", "This billing cycle", "Last 30 days", "Since August 1"}[m.preset]
+		return m, m.refresh(m.presetRange(m.preset))
+	case "b":
+		m.showPlan = !m.showPlan
+	case "o":
+		m.exporting = true
+	case "h":
+		m.info = "Hourly / 5-hour costs unavailable: ccusage unified JSON has no timed usage events. Daily, weekly, monthly are available."
+	case "left":
+		m.dayCursor = max(0, m.dayCursor-1)
+	case "right":
+		m.dayCursor = min(max(0, len(m.chartPeriods())-1), m.dayCursor+1)
+	case "[":
+		m.widget = (m.widget + 3) % 4
+	case "]":
+		m.widget = (m.widget + 1) % 4
+	case "v":
+		m.layout = (m.layout + 1) % 2
+		m.savePreference(func(p *Preferences) {
+			p.Layout = "dashboard"
+			if m.layout == 1 {
+				p.Layout = "stacked"
+			}
+		})
+	case "enter":
+		m.openSelection()
+	case "a":
+		m.agent = cycle(names(m.s, "agent"), m.agent)
+		m.cursor = 0
+		m.details = false
+	case "f":
+		m.modelFilter = cycle(names(m.s, "model"), m.modelFilter)
+		m.cursor = 0
+		m.details = false
+	case "x":
+		m.agent = ""
+		m.modelFilter = ""
+		m.cursor = 0
+	case "r":
+		r := m.o.Range
+		if m.loading {
+			r = m.pending
+		}
+		return m, m.refresh(r, true)
+	case "t":
+		return m.openDateEditor()
+	}
+	return m.settle(msg)
 }
 func cycle(ss []string, s string) string {
 	for i, v := range ss {
@@ -981,55 +912,6 @@ func (m model) compactView() string {
 	return themeRender(lipgloss.NewStyle().Foreground(ink).Padding(1, 2).Render(content), m.o.Theme, m.width, m.height)
 }
 
-func (m *model) refreshExchange() tea.Cmd {
-	return m.refreshExchangeAt(time.Now())
-}
-
-func (m *model) refreshExchangeAt(now time.Time) tea.Cmd {
-	if m.fxLoading && m.fxTarget == m.o.Currency {
-		return nil
-	}
-	if m.fxCancel != nil {
-		m.fxCancel()
-	}
-	m.fxRequest++
-	m.fxLoading = false
-	m.fxTarget = m.o.Currency
-	if m.fx.Currency != m.o.Currency {
-		if m.fx.available() {
-			if m.exchanges == nil {
-				m.exchanges = make(map[string]Exchange)
-			}
-			m.exchanges[m.fx.Currency] = m.fx
-		}
-		m.fx = initialExchange(m.o, now)
-		m.fxErr = ""
-		if x, ok := m.exchanges[m.o.Currency]; ok && x.FetchedAt.After(m.fx.FetchedAt) {
-			m.fx = x
-		}
-	}
-	if m.o.Currency == "USD" {
-		m.fx = usdExchange()
-		m.fxErr = ""
-		return nil
-	}
-	if m.fx.fresh(now) {
-		return nil
-	}
-	m.fxLoading = true
-	m.fxErr = ""
-	ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
-	m.fxCancel = cancel
-	o, id := m.o, m.fxRequest
-	return func() tea.Msg {
-		defer cancel()
-		if o.Demo {
-			return exchangeMsg{exchange: Exchange{Currency: o.Currency, Rate: 0.9, Date: "sample", Source: "synthetic demo rate", FetchedAt: time.Now()}, id: id}
-		}
-		x, err := fetchAndCacheExchange(ctx, &http.Client{Timeout: 10 * time.Second}, exchangeEndpoint, o)
-		return exchangeMsg{exchange: x, err: err, id: id}
-	}
-}
 func (m model) formatMetric(v Metric, cost bool) string {
 	if cost {
 		return m.fx.format(v)
@@ -1056,19 +938,4 @@ func (m model) formatMetric(v Metric, cost bool) string {
 		}
 	}
 	return format(v, false)
-}
-func (m model) exchangeStatus() string {
-	if !m.fx.available() {
-		if m.fxErr != "" {
-			return "FX  unavailable for " + m.o.Currency + " · costs unavailable · r retry"
-		}
-		return "FX  loading " + m.o.Currency + " exchange rate…"
-	}
-	s := m.exchangeLabel()
-	if m.fxErr != "" {
-		s += " · refresh failed; previous rate"
-	} else if m.fxLoading {
-		s += " · refreshing"
-	}
-	return s
 }

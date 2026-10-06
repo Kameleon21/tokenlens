@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 const exchangeEndpoint = "https://api.frankfurter.dev/v2/rate/USD/"
@@ -96,4 +98,113 @@ func (x Exchange) label() string {
 		return ""
 	}
 	return fmt.Sprintf("FX  1 USD = %.6f %s · %s · %s", x.Rate, x.Currency, x.Date, x.Source)
+}
+
+type exchangeMsg struct {
+	exchange Exchange
+	err      error
+	id       int
+}
+
+type exchangeState struct {
+	fx        Exchange
+	fxLoading bool
+	fxErr     string
+	fxCancel  context.CancelFunc
+	fxRequest int
+	fxTarget  string
+	exchanges map[string]Exchange
+}
+
+func (x *exchangeState) stopExchange() {
+	if x.fxCancel != nil {
+		x.fxCancel()
+	}
+}
+
+func (x *exchangeState) rememberExchange(e Exchange) {
+	if x.exchanges == nil {
+		x.exchanges = make(map[string]Exchange)
+	}
+	x.exchanges[e.Currency] = e
+}
+
+func (x *exchangeState) receiveExchange(v exchangeMsg) {
+	x.fxLoading = false
+	if v.err != nil {
+		x.fxErr = v.err.Error()
+		return
+	}
+	x.fx = v.exchange
+	x.rememberExchange(v.exchange)
+	x.fxErr = ""
+}
+
+func (m model) handleExchange(v exchangeMsg) (tea.Model, tea.Cmd) {
+	if v.id != m.fxRequest {
+		return m, nil
+	}
+	m.receiveExchange(v)
+	return m.settle(v)
+}
+
+func (m *model) refreshExchange() tea.Cmd {
+	return m.refreshExchangeAt(time.Now())
+}
+
+func (m *model) refreshExchangeAt(now time.Time) tea.Cmd {
+	if m.fxLoading && m.fxTarget == m.o.Currency {
+		return nil
+	}
+	m.stopExchange()
+	m.fxRequest++
+	m.fxLoading = false
+	m.fxTarget = m.o.Currency
+	if m.fx.Currency != m.o.Currency {
+		if m.fx.available() {
+			m.rememberExchange(m.fx)
+		}
+		m.fx = initialExchange(m.o, now)
+		m.fxErr = ""
+		if x, ok := m.exchanges[m.o.Currency]; ok && x.FetchedAt.After(m.fx.FetchedAt) {
+			m.fx = x
+		}
+	}
+	if m.o.Currency == "USD" {
+		m.fx = usdExchange()
+		m.fxErr = ""
+		return nil
+	}
+	if m.fx.fresh(now) {
+		return nil
+	}
+	m.fxLoading = true
+	m.fxErr = ""
+	ctx, cancel := context.WithTimeout(m.ctx, 10*time.Second)
+	m.fxCancel = cancel
+	o, id := m.o, m.fxRequest
+	return func() tea.Msg {
+		defer cancel()
+		if o.Demo {
+			return exchangeMsg{exchange: Exchange{Currency: o.Currency, Rate: 0.9, Date: "sample", Source: "synthetic demo rate", FetchedAt: time.Now()}, id: id}
+		}
+		x, err := fetchAndCacheExchange(ctx, &http.Client{Timeout: 10 * time.Second}, exchangeEndpoint, o)
+		return exchangeMsg{exchange: x, err: err, id: id}
+	}
+}
+
+func (m model) exchangeStatus() string {
+	if !m.fx.available() {
+		if m.fxErr != "" {
+			return "FX  unavailable for " + m.o.Currency + " · costs unavailable · r retry"
+		}
+		return "FX  loading " + m.o.Currency + " exchange rate…"
+	}
+	s := m.exchangeLabel()
+	if m.fxErr != "" {
+		s += " · refresh failed; previous rate"
+	} else if m.fxLoading {
+		s += " · refreshing"
+	}
+	return s
 }
