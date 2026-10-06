@@ -5,6 +5,8 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+## [0.7.1] - 2026-10-06
+
 ### Fixed
 
 - Remove usage snapshots older than seven days from the cache directory. Snapshots from earlier versions, price revisions, and date ranges were previously kept indefinitely.
@@ -140,3 +142,5 @@ User-visible changes are recorded here. Versions follow the conventions in
 [0.6.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.6.0
 
 [0.7.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.7.0
+
+[0.7.1]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.7.1
