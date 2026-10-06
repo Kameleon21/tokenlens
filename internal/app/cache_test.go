@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 )
@@ -47,6 +48,43 @@ func TestSnapshotCache(t *testing.T) {
 		t.Fatal("corrupt cache accepted")
 	}
 }
+func TestSnapshotCachePrunesExpiredSnapshots(t *testing.T) {
+	m := fixtureModel()
+	o := m.o
+	o.Demo = false
+	o.CacheDir = t.TempDir()
+	old := time.Now().Add(-snapshotMaxAge - time.Hour)
+	stale := filepath.Join(o.CacheDir, strings.Repeat("a", 64)+".json")
+	kept := []string{"prices-v1.json", "exchange-v1-USD-EUR.json", strings.Repeat("b", 64) + ".txt"}
+	for _, name := range append([]string{filepath.Base(stale)}, kept...) {
+		path := filepath.Join(o.CacheDir, name)
+		if e := os.WriteFile(path, []byte("{}"), 0600); e != nil {
+			t.Fatal(e)
+		}
+		if e := os.Chtimes(path, old, old); e != nil {
+			t.Fatal(e)
+		}
+	}
+	recent := filepath.Join(o.CacheDir, strings.Repeat("c", 64)+".json")
+	if e := os.WriteFile(recent, []byte("{}"), 0600); e != nil {
+		t.Fatal(e)
+	}
+	if e := writeSnapshotCache(o, o.Range, m.s); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := os.Stat(stale); !os.IsNotExist(e) {
+		t.Fatal("expired snapshot kept")
+	}
+	for _, name := range append(kept, filepath.Base(recent)) {
+		if _, e := os.Stat(filepath.Join(o.CacheDir, name)); e != nil {
+			t.Fatal("pruned unrelated or recent file", name)
+		}
+	}
+	if _, e := readSnapshotCache(o, o.Range); e != nil {
+		t.Fatal(e)
+	}
+}
+
 func TestCachedSnapshotDoesNotOverwriteFresh(t *testing.T) {
 	m := fixtureModel()
 	m.request = 3

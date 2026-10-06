@@ -8,8 +8,13 @@ import (
 	"github.com/Kameleon21/tokenlens/internal/datefilter"
 	"os"
 	"path/filepath"
+	"regexp"
 	"time"
 )
+
+const snapshotMaxAge = 7 * 24 * time.Hour
+
+var snapshotFile = regexp.MustCompile(`^[0-9a-f]{64}\.json$`)
 
 type cachedMsg struct {
 	s  Snapshot
@@ -52,7 +57,7 @@ func readSnapshotCache(o Options, r datefilter.Range) (Snapshot, error) {
 	if entry.Version != 2 || entry.Snapshot.Loaded.IsZero() || entry.Snapshot.Loaded.After(time.Now().Add(time.Minute)) {
 		return Snapshot{}, fmt.Errorf("invalid cached snapshot")
 	}
-	if time.Since(entry.Snapshot.Loaded) > 7*24*time.Hour {
+	if time.Since(entry.Snapshot.Loaded) > snapshotMaxAge {
 		return Snapshot{}, fmt.Errorf("cached snapshot expired")
 	}
 	entry.Snapshot.prepareTimes()
@@ -85,7 +90,28 @@ func writeSnapshotCache(o Options, r datefilter.Range, s Snapshot) error {
 	if e = f.Close(); e != nil {
 		return e
 	}
-	return os.Rename(f.Name(), path)
+	if e = os.Rename(f.Name(), path); e != nil {
+		return e
+	}
+	pruneSnapshotCache(filepath.Dir(path), time.Now())
+	return nil
+}
+
+// New versions, price revisions, and ranges change the cache key, so expired
+// snapshots are never read again. Only snapshot-named files are removed.
+func pruneSnapshotCache(dir string, now time.Time) {
+	entries, e := os.ReadDir(dir)
+	if e != nil {
+		return
+	}
+	for _, entry := range entries {
+		if !entry.Type().IsRegular() || !snapshotFile.MatchString(entry.Name()) {
+			continue
+		}
+		if info, e := entry.Info(); e == nil && now.Sub(info.ModTime()) > snapshotMaxAge {
+			_ = os.Remove(filepath.Join(dir, entry.Name()))
+		}
+	}
 }
 
 // reusedMsg completes a request without invoking the backend.

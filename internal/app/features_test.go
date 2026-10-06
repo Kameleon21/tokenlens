@@ -1,8 +1,10 @@
 package app
 
 import (
+	"bytes"
 	"encoding/csv"
 	"encoding/json"
+	imgcolor "image/color"
 	"image/png"
 	"os"
 	"path/filepath"
@@ -166,6 +168,33 @@ func TestFilteredExports(t *testing.T) {
 				t.Fatal(e)
 			}
 		}
+	}
+}
+func TestChartExportsUseTheme(t *testing.T) {
+	m := fixtureModel()
+	m.o.Theme = "light"
+	rows := []Row{{Name: "codex", Usage: Usage{Cost: known(1), Tokens: known(10)}}}
+	pal := paletteFor("light")
+	bar := string(colorFor("codex", "light"))
+	svg := m.exportSVG(rows)
+	for _, want := range []string{`fill="` + pal.background + `"`, `fill="` + pal.foreground + `"`, `fill="` + bar + `"`} {
+		if !strings.Contains(svg, want) {
+			t.Fatal("SVG missing theme color", want)
+		}
+	}
+	data, e := m.exportPNG(rows)
+	if e != nil {
+		t.Fatal(e)
+	}
+	img, e := png.Decode(bytes.NewReader(data))
+	if e != nil {
+		t.Fatal(e)
+	}
+	if got := imgcolor.RGBAModel.Convert(img.At(5, 5)); got != hexRGBA(pal.background) {
+		t.Fatal("PNG background", got)
+	}
+	if got := imgcolor.RGBAModel.Convert(img.At(361, 95)); got != hexRGBA(bar) {
+		t.Fatal("PNG bar", got)
 	}
 }
 func TestExportLabelsEscaped(t *testing.T) {
