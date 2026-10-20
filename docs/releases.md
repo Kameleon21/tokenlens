@@ -22,7 +22,7 @@ Never reuse or move a published tag; fix a bad release with a new version.
 ## During development
 
 Add user-visible changes under **Unreleased** in `CHANGELOG.md` in each PR. Do
-not bump the version for every commit. Run `make check` (Go 1.25+, Python 3, and
+not bump the version for every commit. Run `make check` (Go 1.26+, Python 3, and
 Make required). CI also validates GoReleaser and builds all six release archives
 without publishing, including on pull requests.
 

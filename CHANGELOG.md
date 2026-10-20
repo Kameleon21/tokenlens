@@ -5,6 +5,12 @@ User-visible changes are recorded here. Versions follow the conventions in
 
 ## Unreleased
 
+## [0.7.2] - 2026-10-20
+
+### Changed
+
+- Installing from source requires Go 1.26 or newer, up from 1.25, after updating golang.org/x/image and charmbracelet/x/ansi. With Go's default `GOTOOLCHAIN=auto`, older Go versions download 1.26 automatically. Release archives are unaffected.
+
 ## [0.7.1] - 2026-10-06
 
 ### Fixed
@@ -144,3 +150,5 @@ User-visible changes are recorded here. Versions follow the conventions in
 [0.7.0]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.7.0
 
 [0.7.1]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.7.1
+
+[0.7.2]: https://github.com/Kameleon21/tokenlens/releases/tag/v0.7.2

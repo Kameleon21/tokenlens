@@ -57,7 +57,7 @@ release:
     macOS/Linux users can use `python3 scripts/install_release.py` to install
     and update the complete release with checksum verification.
 
-    Or install with Go 1.25+:
+    Or install with Go 1.26+:
 
     ```sh
     go install github.com/Kameleon21/tokenlens@{{ .Tag }}
