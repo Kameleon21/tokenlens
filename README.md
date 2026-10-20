@@ -33,7 +33,7 @@ Its default executable location is `~/.local/bin/tokenlens`; keep that directory
 on your `PATH`. Use `--bin-dir "$HOME/go/bin"` to replace a previous Go installation.
 See the [release guide](docs/releases.md#installing-and-updating) for details.
 
-Alternatively, install from source with **Go 1.25+** and either
+Alternatively, install from source with **Go 1.26+** and either
 [Bun](https://bun.sh) or **ccusage 20.0.20**:
 
 ```sh

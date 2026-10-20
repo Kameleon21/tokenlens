@@ -24,7 +24,7 @@ code; generated changes receive the same review as other contributions.
 
 ## Setup and checks
 
-Install Go 1.25 or newer, Python 3, and Make. Clone the repository and run:
+Install Go 1.26 or newer, Python 3, and Make. Clone the repository and run:
 
 ```sh
 go run . --demo
